@@ -1,6 +1,6 @@
 package main;
 
-public class ClockInt implements Clock<Integer> {
+public final class ClockInt implements Clock<Integer> {
     private int timeStamp;
     @Override
     public Integer increment() {
