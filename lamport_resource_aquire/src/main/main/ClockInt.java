@@ -2,6 +2,8 @@ package main;
 
 public final class ClockInt implements Clock<Integer> {
     private int timeStamp;
+
+    public ClockInt() { this.timeStamp = 0; }
     @Override
     public Integer increment() {
         timeStamp++;
