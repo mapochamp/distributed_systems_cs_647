@@ -10,50 +10,49 @@ import edu.drexel.cs647.java.EchoRequest.Echo;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.ActorRef;
 
-public class ResourceAcquirer extends AbstractBehavior<ResourceAcquirer.Command> {
-    inteface Command{};
-    // Message definitions
-    public static class receiveListOfActors implements Command {
+public class ResourceAcquirer extends AbstractBehavior<ResourceMessage> {
+    public static Behavior<ResourceMessage> create() {
+        return Behaviors.setup(context -> {
+            return new ResourceAcquirer(context);
+        });
     }
 
-    public static class resourceAck implements Command {
-        public final int messageTimeStamp;
+    private List<ActorRef<ResourceMessage>> acquirerList;
+    private ClockInt integerClock;
 
-        public resourceAck(int messageTimeStamp) {
-            this.messageTimeStamp = messageTimeStamp;
-        }
+    private ResourceAcquirer(ActorContext ctxt) {
+        super(ctxt);
     }
 
-    public static class resourceRequest implements Command {
-    }
-
-    // TODO: replace command with Message class or interface
-    // TODO: merge the callbaks into a single switch like in the example
-
-    private ClockInt localClock = new ClockInt();
-
-    public static Behavior<Command> create() {
-        return Behaviors.setup(context -> new ResourceAcquirer(context));
-    }
-    // Default Constructor
-    private ResourceAcquirer(ActorContext<Command> context) {
-        super(context);
-    }
-
-    // State of Actor
     @Override
-    public Receiv<Command> createReceive() {
+    public Receive<ResourceMessage> createReceive() {
+        // This method is only called once for initial setup
         return newReceiveBuilder()
-                .onMessageEquals(resourceAck.INSTANCE, this::onResourceAck)
-                .onMessageEquals(resourceRequest.INSTANCE, this::onResourceReq)
+                // We could register multiple onMessage handlers, for each subclass of ProxyMessage, if we wanted to.
+                // By using a single handler for the general message type, it makes it easier to switch handling of all message types simultaneously (in a later project)
+                .onMessage(ResourceMessage.class, this::dispatch)
                 .build();
     }
 
-    private Behavior<Command> onResourceAck() {
-        return this;
-    }
-
-    private Behavior<Command> onResourceReq() {
+    public Behavior<ResourceMessage> dispatch(ResourceMessage msg) {
+        switch (msg) {
+            // TODO: figure out what to do once we request and implment the aquireing details of the mutex
+            case ResourceMessage.Request r:
+                getContext().getLog().info("[ResourceAcquirer] requesting echo of: "+r.msg());
+                echo.tell(new EchoRequest.Echo(r.msg(), getContext().getSelf()));
+                break;
+            case ResourceMessage.Repeat r:
+                getContext().getLog().info("[ResourceAcquirer] requesting repeat of last message");
+                echo.tell(new EchoRequest.Repeat(getContext().getSelf()));
+                break;
+            case ResourceMessage.Ack a:
+                getContext().getLog().info("[ResourceAcquirer] heard back: "+a.msg());
+                break;
+            case ResourceMessage.End s:
+                getContext().getLog().info("[ResourceAcquirer] shutting down");
+                return Behaviors.stopped();
+        }
+        // Keep the same message handling behavior
         return this;
     }
 }
