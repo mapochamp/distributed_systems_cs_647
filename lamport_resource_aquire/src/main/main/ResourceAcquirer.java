@@ -10,6 +10,9 @@ import edu.drexel.cs647.java.EchoRequest.Echo;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.ActorRef;
 
+import java.util.AbstractMap;
+import java.util.PriorityQueue;
+
 public class ResourceAcquirer extends AbstractBehavior<ResourceMessage> {
     public static Behavior<ResourceMessage> create() {
         return Behaviors.setup(context -> {
@@ -17,12 +20,19 @@ public class ResourceAcquirer extends AbstractBehavior<ResourceMessage> {
         });
     }
 
-    // TODO: how to pass a list of all the actors?
-    private List<ActorRef<ResourceMessage>> acquirerList;
+    private List<ActorRef<ResourceMessage>> actorRefList;
+    // actor id
+    private int myId;
     private ClockInt integerClock;
+    private PriorityQueue<AbstractMap.SimpleEntry<Integer, Integer>> requestQueue;
 
-    private ResourceAcquirer(ActorContext ctxt) {
+    private ResourceAcquirer(ActorContext ctxt, int myId) {
         super(ctxt);
+        this.myId = myId;
+    }
+
+    public setListofActorRefs(List<ActorRef<ResourceMessage>> actorRefList) {
+        this.actorRefList = actorRefList;
     }
 
     @Override
@@ -37,14 +47,22 @@ public class ResourceAcquirer extends AbstractBehavior<ResourceMessage> {
 
     public Behavior<ResourceMessage> dispatch(ResourceMessage msg) {
         switch (msg) {
-            // TODO: figure out what to do once we request and implment the aquireing details of the mutex
             case ResourceMessage.Request r:
-                getContext().getLog().info("[ResourceAcquirer] requesting echo of: "+r.msg());
-                echo.tell(new EchoRequest.Echo(r.msg(), getContext().getSelf()));
+                getContext().getLog().info("[ResourceAcquirer] requesting lock: "+integerClock.getCurrentTimestamp());
+                // TODO: how to sort on the timestamp?
+                requestQueue.add(new AbstractMap.SimpleEntry<>(r.timeStamp(), r.senderId()));
+                integerClock.messageReceived(r.timeStamp());
+                r.sender().tell(new ResourceMessage.Ack(integerClock.getCurrentTimestamp(r.timeStamp()), getContext().getSelf(), myId));
                 break;
-            case ResourceMessage.Repeat r:
-                getContext().getLog().info("[ResourceAcquirer] requesting repeat of last message");
-                echo.tell(new EchoRequest.Repeat(getContext().getSelf()));
+            case ResourceMessage.Release r:
+                // TODO: move this stuff to the behavior when we actually release
+                /*
+                getContext().getLog().info("[ResourceAcquirer] Releasing Lock");
+                for(ActorRef<ResourceMessage> actorRef : actorRefList) {
+                    actorRef.tell(new ResourceMessage.Release(integerClock.getCurrentTimestamp(), getContext().getSelf(), myId));
+                }
+                 */
+                // TODO: remove all the requests from the queu of the id
                 break;
             case ResourceMessage.Ack a:
                 getContext().getLog().info("[ResourceAcquirer] heard back: "+a.msg());

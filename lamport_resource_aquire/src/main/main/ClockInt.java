@@ -11,8 +11,12 @@ public final class ClockInt implements Clock<Integer> {
     }
 
     @Override
-    public Integer messageReceived(Integer messageTimeStamp) {
+    public int messageReceived(Integer messageTimeStamp) {
         timeStamp = Math.max(messageTimeStamp + 1, timeStamp);
+        return timeStamp;
+    }
+
+    public int getCurrentTimestamp() {
         return timeStamp;
     }
 }
