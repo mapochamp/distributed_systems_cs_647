@@ -17,6 +17,7 @@ public class ResourceAcquirer extends AbstractBehavior<ResourceMessage> {
         });
     }
 
+    // TODO: how to pass a list of all the actors?
     private List<ActorRef<ResourceMessage>> acquirerList;
     private ClockInt integerClock;
 

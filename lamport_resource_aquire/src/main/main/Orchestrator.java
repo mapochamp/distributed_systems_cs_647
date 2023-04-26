@@ -13,19 +13,22 @@ public class Orchestrator extends AbstractBehavior<String> {
     public static Behavior<String> create() {
         // TODO: make this so that we loop and spawn stuff
         return Behaviors.setup(context -> {
-            var echo = context.spawn(EchoServer.create(), "echo");
-            var proxy = context.spawn(Proxy.create(echo), "proxy");
-            return new Orchestrator(context, echo, proxy);
+            var resourceAcquirer = context.spawn(ResourceAcquirer.create(), "echo");
+            var mutex = context.spawn(Mutex.create(), "proxy");
+            return new Orchestrator(context, resourceAcquirer, mutex);
         });
     }
 
     // TODO:make this a list of ActorRef's
-    private ActorRef<EchoRequest> resourceAcquirer;
+    private ActorRef<ResourceMessage> resourceAcquirer;
+    private ActorRef<MutexMessage> mutex;
 
-    // TODO: make this take a list of Actor Ref's instead of a single one as an arg
-    private Orchestrator(ActorContext context, ActorRef<EchoRequest> resourceAcquirer) {
+    // TODO: make this take a list of Actor Ref's instead of a single one as an arg?
+    private Orchestrator(ActorContext context, ActorRef<ResourceMessage> resourceAcquirer,
+                         ActorRef<MutexMessage> mutex) {
         super(context);
         this.resourceAcquirer = resourceAcquirer;
+        this.mutex = mutex;
     }
     @Override
     public Receive<String> createReceive() {
@@ -37,16 +40,13 @@ public class Orchestrator extends AbstractBehavior<String> {
     public Behavior<String> dispatch(String txt) {
         getContext().getLog().info("[Orchestrator] received "+txt);
         switch (txt) {
-            case "repeat":
-                proxy.tell(new ProxyMessage.Repeat());
-                break;
             // The Scala version uses a different type here, and essentially uses Behavior<Object>.
             case "shutdown":
-                proxy.tell(new ProxyMessage.Shutdown());
-                echo.tell(new EchoRequest.End());
+                resourceAcquirer.tell(new ResourceMessage.End());
+                mutex.tell(new MutexMessage.End());
                 return Behaviors.stopped();
             default:
-                proxy.tell(new ProxyMessage.Request(txt));
+                resourceAcquirer.tell(new Mutex.Lock(resourceAcquirer));
         }
         return this;
     }
