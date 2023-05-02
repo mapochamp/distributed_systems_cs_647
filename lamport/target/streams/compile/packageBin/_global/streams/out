@@ -1,0 +1,97 @@
+[0m[[0m[0mdebug[0m] [0m[0mPackaging /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/lamport_3-0.1.0-SNAPSHOT.jar ...[0m
+[0m[[0m[0mdebug[0m] [0m[0mInput file mappings:[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$LockRequestReject 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$LockRequestReject 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/Clock.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/Clock.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceAcquirer.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceAcquirer.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/MutexMessage$End.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/MutexMessage$End.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$Init.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$Init.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$Init 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$Init 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$LockRequestReject.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$LockRequestReject.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$Release.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$Release.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$LockRequestAck 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$LockRequestAck 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/Orchestrator 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/Orchestrator 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ClockInt.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ClockInt.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$End.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$End.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$Request.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$Request.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$LockReleaseReject.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$LockReleaseReject.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/LamportMutexImplementation.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/LamportMutexImplementation.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/MutexMessage$End 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/MutexMessage$End 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/MutexMessage$Release.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/MutexMessage$Release.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$LockRequestAck.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$LockRequestAck.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/Orchestrator 3.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/Orchestrator 3.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/Clock 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/Clock 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/MutexMessage.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/MutexMessage.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ClockInt 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ClockInt 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/MutexMessage$Release 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/MutexMessage$Release 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$LockReleaseAck.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$LockReleaseAck.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/MutexMessage 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/MutexMessage 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/LamportMutexImplementation 3.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/LamportMutexImplementation 3.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/Mutex.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/Mutex.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$LockReleaseAck 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$LockReleaseAck 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$Ack 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$Ack 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$InitKickOff.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$InitKickOff.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$Release 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$Release 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/Orchestrator.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/Orchestrator.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/LamportMutexImplementation 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/LamportMutexImplementation 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$LockReleaseReject 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$LockReleaseReject 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$Ack.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$Ack.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/MutexMessage$Lock.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/MutexMessage$Lock.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$InitActorRefList.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$InitActorRefList.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceAcquirer 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceAcquirer 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/Mutex 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/Mutex 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$End 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$End 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$InitActorRefList 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$InitActorRefList 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$InitKickOff 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$InitKickOff 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/MutexMessage$Lock 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/MutexMessage$Lock 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	lamport_tyj27/ResourceMessage$Request 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0m	  /Users/tajungjang/Documents/cs_647/lamport/target/scala-3.2.2/classes/lamport_tyj27/ResourceMessage$Request 2.class[0m
+[0m[[0m[0mdebug[0m] [0m[0mDone packaging.[0m
