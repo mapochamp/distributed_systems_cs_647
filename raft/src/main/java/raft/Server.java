@@ -11,15 +11,6 @@ import akka.actor.typed.ActorRef;
 import java.util.*;
 
 
-public class Pair<X, Y> {
-  public final X first;
-  public final Y second;
-  public Pair(X first, Y second, X first1) {
-      this.first = first;
-      this.second = second;
-  }
-}
-
 public class Server extends AbstractBehavior<ServerRPC>{
     public static Behavior<ServerRPC> create() {
         return Behaviors.setup(context -> {
@@ -27,8 +18,15 @@ public class Server extends AbstractBehavior<ServerRPC>{
         });
     }
 
-    private Proxy(ActorContext ctxt) {
+    private Server(ActorContext ctxt) {
         super(ctxt);
+        this.currentTerm = 0;
+        this.votedFor = 0;
+        this.log = new ArrayList<Pair<Command<Integer>, Integer>>();
+        this.commitIndex = 0;
+        this.lastApplied = 0;
+        this.nextIndex = new ArrayList<>();
+        this.matchIndex = new ArrayList<>();
     }
 
     // Presistent State
@@ -77,5 +75,15 @@ public class Server extends AbstractBehavior<ServerRPC>{
         }
         // Keep the same message handling behavior
         return this;
+    }
+
+    public static class Pair<X, Y> {
+        public final X first;
+        public final Y second;
+
+        public Pair(X first, Y second, X first1) {
+            this.first = first;
+            this.second = second;
+        }
     }
 }

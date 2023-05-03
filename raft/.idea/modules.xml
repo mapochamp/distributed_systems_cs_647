@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/raft.iml" filepath="$PROJECT_DIR$/.idea/modules/raft.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/raft-build.iml" filepath="$PROJECT_DIR$/.idea/modules/raft-build.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/akkademo1.iml" filepath="$PROJECT_DIR$/.idea/modules/akkademo1.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/akkademo1-build.iml" filepath="$PROJECT_DIR$/.idea/modules/akkademo1-build.iml" />
     </modules>
   </component>
 </project>
