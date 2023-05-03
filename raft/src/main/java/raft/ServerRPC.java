@@ -9,4 +9,5 @@ public sealed interface ServerRPC {
     public final record RequestVote(int term, int candidateId, int lastLogIndex,
                                     int lastLogTerm) {}
     public final record RequestVoteResult(int term, boolean voteGranted) {}
+    public final record HeartBeat() {}
 }
