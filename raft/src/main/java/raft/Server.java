@@ -29,6 +29,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.lastApplied = 0;
         this.nextIndex = new ArrayList<>();
         this.matchIndex = new ArrayList<>();
+        this.follower = true;
         try {
             this.log = new FileArray(String.format("%d_server_log", this.id));
        } catch (IOException e) {
@@ -46,6 +47,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
     // Volatile state
     int commitIndex;
     int lastApplied;
+    boolean follower;
 
     // Volatile state on leaders
     List<Integer> nextIndex;
@@ -90,8 +92,28 @@ public class Server extends AbstractBehavior<ServerRPC>{
             case ServerRPC.AppendEntriesResult a:
                 break;
             case ServerRPC.RequestVote r:
-                //getContext().getLog().info("[ServerRPC] echoing "+e.msg());
+                if(r.term() < currentTerm) {
+                    r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                                                                    getContext().getSelf()));
+                    votedFor = 0;
+                    break;
+                }
+                if(votedFor == 0  || votedFor == r.candidateId()) {
+                    if(getLogTerm(r.lastLogIndex()) <= r.lastLogTerm()) {
+                        votedFor = r.candidateId();
+                        r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                                getContext().getSelf()));
+                        break;
+                    }
+                    r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                            getContext().getSelf()));
+                } else {
+                    r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                            getContext().getSelf()));
+                }
+                votedFor = 0;
                 break;
+            break;
             case ServerRPC.RequestVoteResult r:
                 //getContext().getLog().info("[ServerRPC] echoing "+e.msg());
                 break;
