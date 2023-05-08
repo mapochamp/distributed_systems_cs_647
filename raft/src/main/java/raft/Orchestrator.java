@@ -16,10 +16,10 @@ public class Orchestrator extends AbstractBehavior<String> {
         return Behaviors.setup(context -> {
             List<ActorRef<ServerRPC>> ServerList = new ArrayList<ActorRef<ServerRPC>>();
             List<ActorRef<ClientRPC>> ClientList = new ArrayList<ActorRef<ClientRPC>>();
-            for(int i=0; i < numServers; i++) {
+            for(int i=1; i < numServers+1; i++) {
                 ServerList.add(context.spawn(Server.create(i), String.format("Server%d", i)));
             }
-            for(int i=0; i < numClients; i++) {
+            for(int i=1; i < numClients+1; i++) {
                 ClientList.add(context.spawn(Client.create(i), String.format("Client%d", i)));
             }
             return new Orchestrator(context, ServerList, ClientList);
