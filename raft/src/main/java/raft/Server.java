@@ -12,14 +12,15 @@ import java.util.*;
 
 
 public class Server extends AbstractBehavior<ServerRPC>{
-    public static Behavior<ServerRPC> create() {
+    public static Behavior<ServerRPC> create(int id) {
         return Behaviors.setup(context -> {
             return new Server(context);
         });
     }
 
-    private Server(ActorContext ctxt) {
+    private Server(ActorContext ctxt, int id) {
         super(ctxt);
+        this.id = id;
         this.currentTerm = 0;
         this.votedFor = 0;
         this.log = new ArrayList<Pair<Command<Integer>, Integer>>();
@@ -30,6 +31,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
     }
 
     // Presistent State
+    int id;
     int currentTerm;
     int votedFor;
     List<Pair<Command<Integer>, Integer>> log;
@@ -57,26 +59,32 @@ public class Server extends AbstractBehavior<ServerRPC>{
         // This style of switch statement is technically a preview feature in many versions of Java, so you'll need to compile with --enable-preview
         switch (msg) {
             case ServerRPC.AppendEntries a:
+                if(a.term() < currentTerm) {
+                    a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
+                            false, getContext().getSelf()));
+                    break;
+                    // TODO: do we need an out of bounds check here
+                } else if (log.get(a.prevLogIndex()).second != a.prevLogTerm()) {
+                    a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
+                            false, getContext().getSelf()));
+                    break;
+                } else if(log.get(a.prevLogIndex()).second != a.prevLogIndex()) { // receiver implementation #3
+
+                } else if() { // heart beat (empty etnries)
+
+                }
                 break;
             case ServerRPC.AppendEntriesResult a:
-                    lastmsg = e.msg();
-                getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ProxyMessage.Ack(lastmsg));
                 break;
             case ServerRPC.RequestVote r:
                 lastmsg = e.msg();
                 getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ProxyMessage.Ack(lastmsg));
+                e.sender().tell(new ServerRPC.Ack(lastmsg));
                 break;
             case ServerRPC.RequestVoteResult r:
                 lastmsg = e.msg();
                 getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ProxyMessage.Ack(lastmsg));
-                break;
-            case ServerRPC.HeartBeat h:
-                lastmsg = e.msg();
-                getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ProxyMessage.Ack(lastmsg));
+                e.sender().tell(new ServerRPC.Ack(lastmsg));
                 break;
             case default:
                 return Behaviors.stopped();
@@ -89,7 +97,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         public final X first;
         public final Y second;
 
-        public Pair(X first, Y second, X first1) {
+        public Pair(X first, Y second) {
             this.first = first;
             this.second = second;
         }
