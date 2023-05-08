@@ -14,7 +14,7 @@ import java.util.*;
 public class Server extends AbstractBehavior<ServerRPC>{
     public static Behavior<ServerRPC> create(int id) {
         return Behaviors.setup(context -> {
-            return new Server(context);
+            return new Server(context, id);
         });
     }
 
@@ -55,7 +55,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 .build();
     }
 
-    public Behavior<ServerRPC> dispatch(EchoRequest msg) {
+    public Behavior<ServerRPC> dispatch(ServerRPC msg) {
         // This style of switch statement is technically a preview feature in many versions of Java, so you'll need to compile with --enable-preview
         switch (msg) {
             case ServerRPC.AppendEntries a:
@@ -70,21 +70,17 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     break;
                 } else if(log.get(a.prevLogIndex()).second != a.prevLogIndex()) { // receiver implementation #3
 
-                } else if() { // heart beat (empty etnries)
+                //} else if() { // heart beat (empty etnries)
 
                 }
                 break;
             case ServerRPC.AppendEntriesResult a:
                 break;
             case ServerRPC.RequestVote r:
-                lastmsg = e.msg();
-                getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ServerRPC.Ack(lastmsg));
+                //getContext().getLog().info("[ServerRPC] echoing "+e.msg());
                 break;
             case ServerRPC.RequestVoteResult r:
-                lastmsg = e.msg();
-                getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ServerRPC.Ack(lastmsg));
+                //getContext().getLog().info("[ServerRPC] echoing "+e.msg());
                 break;
             case default:
                 return Behaviors.stopped();

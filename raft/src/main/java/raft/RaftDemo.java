@@ -18,8 +18,9 @@ public class RaftDemo {
         System.out.println("Running Java version");
         int numServers = 0;
         int numClients = 0;
-        if(args.length != 1) {
+        if(args.length != 2) {
             System.out.println("Invalid number of args");
+            System.out.println("sbt run [num servers] [num clients]");
             return;
         } else {
             numServers = Integer.parseInt(args[0]);
