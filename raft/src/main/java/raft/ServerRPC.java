@@ -7,9 +7,10 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
+import raft.Server.Pair;
 public sealed interface ServerRPC {
     public final record AppendEntries(int term, int leaderId, int prevLogIndex,
-                                      int prevLogTerm, List<Command<Integer>> entries,
+                                      int prevLogTerm, List<List<Integer>> entries,
                                       int leaderCommit,
                                       ActorRef<ServerRPC> sender )implements ServerRPC {}
     public final record AppendEntriesResult(int term, boolean success,
