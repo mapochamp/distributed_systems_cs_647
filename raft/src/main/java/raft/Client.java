@@ -62,16 +62,22 @@ public class Client extends AbstractBehavior<ClientRPC> {
                 Random random = new Random();
                 int randomIndex = random.nextInt(serverList.size());
                 getContext().getLog().info(String.format("[Client %d] sending request %d",
-                        id, randomIndex+1));
+                        id, randomIndex));
                 sendRequest(serverList.get(randomIndex), randomIndex);
                 break;
             case ClientRPC.RequestAck r:
+                getContext().getLog().info(String.format("[Client %d] request committed", id));
                 // we got an ack from the leader that something was committed
                 restartTimer();
                 break;
             case ClientRPC.RequestReject r:
                 // we didn't send it to the leader so send it to the leader
-                sendRequest(r.leader(), r.entry());
+                getContext().getLog().info(String.format("[Client %d] request rejected", id));
+                if(r.leader() == null) {
+                    restartTimer();
+                } else {
+                    sendRequest(r.leader(), r.entry());
+                }
                 break;
             case ClientRPC.Init i:
                 getContext().getLog().info(String.format("[Client %d] initializing", id));

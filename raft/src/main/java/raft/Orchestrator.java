@@ -46,6 +46,7 @@ public class Orchestrator extends AbstractBehavior<String> {
                 .build();
     }
 
+    // TODO: restart/kill servers
     public Behavior<String> dispatch(String txt) {
         getContext().getLog().info("[Orchestrator] received "+txt);
         switch (txt) {

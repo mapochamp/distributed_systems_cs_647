@@ -1,5 +1,4 @@
 package raft;
-
 import akka.actor.typed.Behavior;
 import akka.actor.typed.PostStop;
 import akka.actor.typed.javadsl.AbstractBehavior;
@@ -39,10 +38,12 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.votedFor = 0;
         this.commitIndex = 0;
         this.lastApplied = 0;
+        this.currentLeader = null;
         this.nextIndex = new ArrayList<>();
         this.matchIndex = new ArrayList<>();
         this.currentState = State.FOLLOWER;
         this.nextIndexMap = new HashMap<>();
+        this.matchIndexMap = new HashMap<>();
         try {
             this.log = new FileArray(String.format("%d_server_log", this.id));
        } catch (IOException e) {
@@ -69,9 +70,12 @@ public class Server extends AbstractBehavior<ServerRPC>{
     // Volatile state
     int commitIndex;
     int lastApplied;
+    int votesReceived;
     State currentState;
+    ActorRef<ServerRPC> currentLeader;
     // id : nextIndex
     Map<ActorRef<ServerRPC>, Integer> nextIndexMap;
+    Map<ActorRef<ServerRPC>, Integer> matchIndexMap;
 
     // Volatile state on leaders
     List<Integer> nextIndex;
@@ -91,10 +95,14 @@ public class Server extends AbstractBehavior<ServerRPC>{
     public Behavior<ServerRPC> dispatch(ServerRPC msg) {
         // This style of switch statement is technically a preview feature in many versions of Java, so you'll need to compile with --enable-preview
         switch (msg) {
+            // TODO: WHAT DO WE DO ON A HEARTBEAT OR INITTED MESSAGE WHERE THE ENTRIES ARE EMPTY?
             case ServerRPC.AppendEntries a:
+                restartTimer();
+                if(a.term() > currentTerm) {
+                    updateTerm(a.term());
+                }
                 getContext().getLog().info(String.format("[Server %d] received Append Entries Request " +
                         " term %d", id, a.term()));
-                restartTimer();
                 if(a.term() < currentTerm) {
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
@@ -105,10 +113,14 @@ public class Server extends AbstractBehavior<ServerRPC>{
                             false, getContext().getSelf()));
                     break;
                 } else if(getLogTerm(a.prevLogIndex()) == a.prevLogTerm()) {
+                    getContext().getLog().info(String.format("[Server %d] conflict" +
+                            " term %d", id, a.term()));
                     int conflictIdx = conflictExists(a.entries(), a.prevLogIndex());
                     if(conflictIdx != -1) {
                         deleteConflicts(conflictIdx);
                     }
+                    getContext().getLog().info(String.format("[Server %d] appending entries" +
+                            " term %d", id, a.term()));
                     appendNewEntries(a.entries(), a.prevLogIndex());
                     updateCommitIndex(a.leaderCommit());
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
@@ -117,19 +129,19 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 }
                 break;
             case ServerRPC.AppendEntriesResult a:
+                restartTimer();
                 getContext().getLog().info(String.format("[Server %d] got Append entries result", id));
                 // if we get a true and enough servers reply true then we increment commit index
                 // if we get a false then ...
-                restartTimer();
                 break;
             case ServerRPC.RequestVote r:
-                getContext().getLog().info(String.format("[Server %d] got Vote request", id));
-                // TODO: once you become leader, send out a heart beat
-                // TODO: you can only vote once per term
-                // TODO: become leader if you get all the votes
-                // TODO: tie break on log length
-                // TODO: update term if we need to
                 restartTimer();
+                if(r.term() > currentTerm) {
+                    updateTerm(r.term());
+                }
+                getContext().getLog().info(String.format("[Server %d] got Vote request", id));
+                // TODO: you can only vote once per term
+                // TODO: tie break on log length
                 if(r.term() < currentTerm) {
                     r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
                                                                     getContext().getSelf()));
@@ -151,29 +163,75 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 }
                 votedFor = 0;
                 break;
+            case ServerRPC.RequestVoteResult r:
+                restartTimer();
+                getContext().getLog().info(String.format("[Server %d] got vote result", id));
+                votesReceived++;
+                if(votesReceived > (serverList.size()/2)) {
+                    currentState = State.LEADER;
+                    List<List<Integer>> entry = new ArrayList<>();
+                    // send heartbeat
+                    for(var server : serverList) {
+                        server.tell(new ServerRPC.AppendEntries(currentTerm, id,
+                                lastApplied, getLogTerm(lastApplied), entry, commitIndex,
+                                getContext().getSelf()));
+                    }
+                }
+                break;
             case ServerRPC.ClientRequest c:
+                if(currentState == State.FOLLOWER) {
+                    c.sender().tell(new ClientRPC.RequestReject(currentLeader, c.entry()));
+                } else {
+                    // TODO: make all entries just fucking ints
+                    // TODO: we have to make sure that if we're currently catching up a node then we don't send it
+                    // the entry data structure is meant to be able take multiple entries at once even though
+                    // we only send one at a time. this is just simulating things
+                    List<List<Integer>> entry = new ArrayList<>();
+                    List<Integer> temp = new ArrayList<>();
+                    temp.add(c.entry(), currentTerm);
+                    entry.add(temp);
+                    for(var server : serverList) {
+                        server.tell(new ServerRPC.AppendEntries(currentTerm, id, lastApplied,
+                                getLogTerm(lastApplied) ,entry, commitIndex, getContext().getSelf()));
+                    }
+                }
                 getContext().getLog().info(String.format("[Server %d] got client request", id));
                 break;
-            case ServerRPC.RequestVoteResult r:
-                getContext().getLog().info(String.format("[Server %d] got vote result", id));
-                restartTimer();
-                break;
             case ServerRPC.Timeout t:
-                getContext().getLog().info(String.format("[Server %d] timed out on term %d",
-                        id, currentTerm));
-                // set candidate state and try to become leader
-                // set new term
-                // vote for yourself
-                // wait for votes
-                timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
+                if (currentState == State.LEADER) {
+                    // reset timer to fixed number
+                    restartTimer();
+                    // send heartbeat (empty append entries rpc)
+                } else {
+                    getContext().getLog().info(String.format("[Server %d] timed out on term %d",
+                            id, currentTerm));
+                    // set candidate state and try to become leader
+                    currentState = State.CANDIDATE;
+                    // set new term
+                    currentTerm++;
+                    // vote for yourself
+                    votedFor = id;
+                    votesReceived = 1;
+                    // reset election timer
+                    restartTimer();
+                    //send requestVoteRPC to all other servers
+                    getContext().getLog().info(String.format("[Server %d] starting to broadcasting vote", id));
+                    for(var server : serverList) {
+                        server.tell(new ServerRPC.RequestVote(currentTerm, id, lastApplied,
+                                getLogTerm(lastApplied), getContext().getSelf()));
+                    }
+                    getContext().getLog().info(String.format("[Server %d] done broadcasting vote", id));
+                }
                 break;
             case ServerRPC.Init i:
-                getContext().getLog().info(String.format("[Server %d] initializing",
-                        id));
+                getContext().getLog().info(String.format("[Server %d] initializing", id));
                 timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
                 serverList = i.serverList();
+                //TODO: remove ourselves from serverlist
+                removeFromServerList(this.serverList, getContext().getSelf());
                 for(ActorRef<ServerRPC> server : serverList) {
                     nextIndexMap.put(server, 0);
+                    matchIndexMap.put(server, 0);
                 }
                 break;
             case default:
@@ -183,12 +241,34 @@ public class Server extends AbstractBehavior<ServerRPC>{
         return this;
     }
 
+    private void removeFromServerList(List<ActorRef<ServerRPC>> serverList, ActorRef<ServerRPC> serverToRemove) {
+        Iterator<ActorRef<ServerRPC>> iterator = serverList.iterator();
+        while(iterator.hasNext()) {
+            ActorRef<ServerRPC> entry = iterator.next();
+            if(entry == serverToRemove) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private void updateTerm(int newTerm) {
+        currentTerm = newTerm;
+        if(currentState != State.FOLLOWER) {
+            currentState = State.FOLLOWER;
+        }
+    }
+
     private void restartTimer() {
-        timers.cancel(TIMER_KEY);
-        Random random = new Random();
-        int seconds = random.nextInt(7) + 2;
-        after = Duration.ofSeconds(seconds);
-        timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
+        if(currentState != State.LEADER) {
+            timers.cancel(TIMER_KEY);
+            Random random = new Random();
+            int seconds = random.nextInt(7) + 2;
+            after = Duration.ofSeconds(seconds);
+            timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
+        } else {
+            after = Duration.ofSeconds(3);
+            timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
+        }
     }
 
     private int getLogTerm(int prevLogIndex) {
@@ -225,6 +305,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
         }
     }
 
+    // TODO: we get index out of bounds when trying access things at the very beginning when
+    // prev log index = 0 and we try to access a file with no lines.
     private int conflictExists(List<List<Integer>> entries, int prevLogIndex) {
         try {
             log.readFile();

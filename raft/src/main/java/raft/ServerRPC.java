@@ -9,6 +9,8 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import raft.Server.Pair;
 public sealed interface ServerRPC {
+    // entries are stored as list of pairs (we use list as a pair). so its like
+    // [ <entry, term> , <entry, term> , ... , <entry, term> ]
     public final record AppendEntries(int term, int leaderId, int prevLogIndex,
                                       int prevLogTerm, List<List<Integer>> entries,
                                       int leaderCommit,
