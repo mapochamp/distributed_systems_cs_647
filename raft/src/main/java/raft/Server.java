@@ -8,35 +8,46 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.ActorRef;
+
+import java.io.IOException;
 import java.util.*;
 
 
 public class Server extends AbstractBehavior<ServerRPC>{
-    public static Behavior<ServerRPC> create() {
+    public static Behavior<ServerRPC> create(int id) {
         return Behaviors.setup(context -> {
-            return new Server(context);
+            return new Server(context, id);
         });
     }
 
-    private Server(ActorContext ctxt) {
+    private Server(ActorContext ctxt, int id) {
         super(ctxt);
+        this.id = id;
         this.currentTerm = 0;
         this.votedFor = 0;
-        this.log = new ArrayList<Pair<Command<Integer>, Integer>>();
         this.commitIndex = 0;
         this.lastApplied = 0;
         this.nextIndex = new ArrayList<>();
         this.matchIndex = new ArrayList<>();
+        this.follower = true;
+        try {
+            this.log = new FileArray(String.format("%d_server_log", this.id));
+       } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     // Presistent State
+    FileArray log;
+    int id;
     int currentTerm;
     int votedFor;
-    List<Pair<Command<Integer>, Integer>> log;
+    List<Pair<Integer, Integer>> templog;
 
     // Volatile state
     int commitIndex;
     int lastApplied;
+    boolean follower;
 
     // Volatile state on leaders
     List<Integer> nextIndex;
@@ -53,30 +64,58 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 .build();
     }
 
-    public Behavior<ServerRPC> dispatch(EchoRequest msg) {
+    public Behavior<ServerRPC> dispatch(ServerRPC msg) {
         // This style of switch statement is technically a preview feature in many versions of Java, so you'll need to compile with --enable-preview
         switch (msg) {
             case ServerRPC.AppendEntries a:
+                if(a.term() < currentTerm) {
+                    a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
+                            false, getContext().getSelf()));
+                    break;
+                    // TODO: do we need an out of bounds check here
+                } else if(getLogTerm(a.prevLogIndex()) != a.prevLogTerm()) {
+                    a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
+                            false, getContext().getSelf()));
+                    break;
+                } else if(getLogTerm(a.prevLogIndex()) == a.prevLogTerm()) {
+                    int conflictIdx = conflictExists(a.entries(), a.prevLogIndex());
+                    if(conflictIdx != -1) {
+                        deleteConflicts(conflictIdx);
+                    }
+                    appendNewEntries(a.entries(), a.prevLogIndex());
+                    updateCommitIndex(a.leaderCommit());
+                    a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
+                            true, getContext().getSelf()));
+                    break;
+                }
                 break;
             case ServerRPC.AppendEntriesResult a:
-                    lastmsg = e.msg();
-                getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ProxyMessage.Ack(lastmsg));
                 break;
             case ServerRPC.RequestVote r:
-                lastmsg = e.msg();
-                getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ProxyMessage.Ack(lastmsg));
+                if(r.term() < currentTerm) {
+                    r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                                                                    getContext().getSelf()));
+                    votedFor = 0;
+                    break;
+                }
+                if(votedFor == 0  || votedFor == r.candidateId()) {
+                    if(getLogTerm(r.lastLogIndex()) <= r.lastLogTerm()) {
+                        votedFor = r.candidateId();
+                        r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                                getContext().getSelf()));
+                        break;
+                    }
+                    r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                            getContext().getSelf()));
+                } else {
+                    r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                            getContext().getSelf()));
+                }
+                votedFor = 0;
                 break;
+            break;
             case ServerRPC.RequestVoteResult r:
-                lastmsg = e.msg();
-                getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ProxyMessage.Ack(lastmsg));
-                break;
-            case ServerRPC.HeartBeat h:
-                lastmsg = e.msg();
-                getContext().getLog().info("[EchoServer] echoing "+e.msg());
-                e.sender().tell(new ProxyMessage.Ack(lastmsg));
+                //getContext().getLog().info("[ServerRPC] echoing "+e.msg());
                 break;
             case default:
                 return Behaviors.stopped();
@@ -85,13 +124,91 @@ public class Server extends AbstractBehavior<ServerRPC>{
         return this;
     }
 
-    public static class Pair<X, Y> {
-        public final X first;
-        public final Y second;
-
-        public Pair(X first, Y second, X first1) {
-            this.first = first;
-            this.second = second;
+    private int getLogTerm(int prevLogIndex) {
+        try {
+            log.readFile();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+
+        var entries = log.get(prevLogIndex);
+
+        try {
+            log.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return entries.get(1);
+    }
+
+    private void deleteConflicts(int index) {
+        try {
+            log.readFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+       log.truncate(index);
+
+        try {
+            log.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private int conflictExists(List<List<Integer>> entries, int prevLogIndex) {
+        try {
+            log.readFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        int entriesIdx = 0;
+        for(int i = prevLogIndex + 1; i < log.size(); i++) {
+            var localEntries = log.get(i);
+            // if our term doesn't match the entry term
+            if(localEntries.get(1) != entries.get(entriesIdx).get(1)) {
+               return i;
+            }
+            entriesIdx++;
+        }
+
+        try {
+            log.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    private void appendNewEntries(List<List<Integer>> entries, int prevLogIndex) {
+        try {
+            log.readFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        for(int i = 0; i < entries.size(); i++) {
+            List<Integer> newLine = new ArrayList<>();
+            newLine.add(entries.get(i).get(0));
+            newLine.add(entries.get(i).get(1));
+            log.add(newLine);
+        }
+
+        try {
+            log.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateCommitIndex(int leaderCommit) {
+        if(leaderCommit > commitIndex) {
+            commitIndex = Math.min(leaderCommit, log.size() - 1);
+        }
+    }
+
+    public record Pair<X, Y>(X first, Y second) {
     }
 }
