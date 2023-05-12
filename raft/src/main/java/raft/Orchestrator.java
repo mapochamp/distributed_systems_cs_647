@@ -9,6 +9,7 @@ import akka.actor.typed.javadsl.Receive;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
 
 
 public class Orchestrator extends AbstractBehavior<String> {
@@ -20,7 +21,7 @@ public class Orchestrator extends AbstractBehavior<String> {
                 ServerList.add(context.spawn(Server.create(i), String.format("Server%d", i)));
             }
             for(int i=1; i < numClients+1; i++) {
-                ClientList.add(context.spawn(Client.create(i), String.format("Client%d", i)));
+                ClientList.add(context.spawn(Client.create(i, ServerList), String.format("Client%d", i)));
             }
             return new Orchestrator(context, ServerList, ClientList);
         });
@@ -61,7 +62,24 @@ public class Orchestrator extends AbstractBehavior<String> {
                 return Behaviors.stopped();
             default:
                 // TODO init. idk
-                ServerList.get(0).tell(new ServerRPC.End());
+                if(!initialized)  {
+                    getContext().getLog().info("Initializing all servers");
+                    for(ActorRef<ServerRPC> actorRef : ServerList) {
+                        actorRef.tell(new ServerRPC.Init(ServerList));
+                    }
+                    getContext().getLog().info("Initializing all clients");
+                    for(ActorRef<ClientRPC> actorRef : ClientList) {
+                        actorRef.tell(new ClientRPC.Init());
+                    }
+                } else  {
+                    for(ActorRef<ServerRPC> actorRef : ServerList) {
+                        actorRef.tell(new ServerRPC.End());
+                    }
+                    for(ActorRef<ClientRPC> actorRef : ClientList) {
+                        actorRef.tell(new ClientRPC.End());
+                    }
+                    return Behaviors.stopped();
+                }
         }
         return this;
     }

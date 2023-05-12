@@ -21,5 +21,9 @@ public sealed interface ServerRPC {
     public final record RequestVoteResult(int term, boolean voteGranted,
                                           ActorRef<ServerRPC> sender) implements  ServerRPC {}
 
+    public final record ClientRequest(ActorRef<ClientRPC> sender, int entry) implements ServerRPC {}
+    public final record Timeout() implements ServerRPC {}
+    public final record Init(List<ActorRef<ServerRPC>> serverList) implements ServerRPC {}
+    
     public final record End() implements ServerRPC {}
 }

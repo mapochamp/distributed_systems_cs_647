@@ -8,20 +8,32 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.ActorRef;
+import akka.actor.typed.javadsl.TimerScheduler;
+
+import java.time.Duration;
 
 import java.io.IOException;
 import java.util.*;
 
 
 public class Server extends AbstractBehavior<ServerRPC>{
+
     public static Behavior<ServerRPC> create(int id) {
-        return Behaviors.setup(context -> {
-            return new Server(context, id);
-        });
+        return Behaviors.setup(context ->
+                Behaviors.withTimers(timers -> {
+                    Random random = new Random();
+                    int seconds = random.nextInt(7) + 2;
+                    Duration after = Duration.ofSeconds(seconds);
+                    return new Server(context, timers, id,after);
+                })
+        );
     }
 
-    private Server(ActorContext ctxt, int id) {
+
+    private Server(ActorContext ctxt, TimerScheduler<ServerRPC> timers, int id, Duration after) {
         super(ctxt);
+        this.timers = timers;
+        this.after = after;
         this.id = id;
         this.currentTerm = 0;
         this.votedFor = 0;
@@ -29,7 +41,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.lastApplied = 0;
         this.nextIndex = new ArrayList<>();
         this.matchIndex = new ArrayList<>();
-        this.follower = true;
+        this.currentState = State.FOLLOWER;
+        this.nextIndexMap = new HashMap<>();
         try {
             this.log = new FileArray(String.format("%d_server_log", this.id));
        } catch (IOException e) {
@@ -37,17 +50,28 @@ public class Server extends AbstractBehavior<ServerRPC>{
         }
     }
 
+    private enum State {
+        FOLLOWER,
+        CANDIDATE,
+        LEADER
+    }
+    private static final Object TIMER_KEY = new Object();
+    private final TimerScheduler<ServerRPC> timers;
+    private Duration after;
     // Presistent State
     FileArray log;
     int id;
     int currentTerm;
     int votedFor;
     List<Pair<Integer, Integer>> templog;
+    List<ActorRef<ServerRPC>> serverList;
 
     // Volatile state
     int commitIndex;
     int lastApplied;
-    boolean follower;
+    State currentState;
+    // id : nextIndex
+    Map<ActorRef<ServerRPC>, Integer> nextIndexMap;
 
     // Volatile state on leaders
     List<Integer> nextIndex;
@@ -68,6 +92,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
         // This style of switch statement is technically a preview feature in many versions of Java, so you'll need to compile with --enable-preview
         switch (msg) {
             case ServerRPC.AppendEntries a:
+                getContext().getLog().info(String.format("[Server %d] received Append Entries Request " +
+                        " term %d", id, a.term()));
+                restartTimer();
                 if(a.term() < currentTerm) {
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
@@ -90,8 +117,19 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 }
                 break;
             case ServerRPC.AppendEntriesResult a:
+                getContext().getLog().info(String.format("[Server %d] got Append entries result", id));
+                // if we get a true and enough servers reply true then we increment commit index
+                // if we get a false then ...
+                restartTimer();
                 break;
             case ServerRPC.RequestVote r:
+                getContext().getLog().info(String.format("[Server %d] got Vote request", id));
+                // TODO: once you become leader, send out a heart beat
+                // TODO: you can only vote once per term
+                // TODO: become leader if you get all the votes
+                // TODO: tie break on log length
+                // TODO: update term if we need to
+                restartTimer();
                 if(r.term() < currentTerm) {
                     r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
                                                                     getContext().getSelf()));
@@ -101,7 +139,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 if(votedFor == 0  || votedFor == r.candidateId()) {
                     if(getLogTerm(r.lastLogIndex()) <= r.lastLogTerm()) {
                         votedFor = r.candidateId();
-                        r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
+                        r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, true,
                                 getContext().getSelf()));
                         break;
                     }
@@ -113,15 +151,44 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 }
                 votedFor = 0;
                 break;
-            break;
+            case ServerRPC.ClientRequest c:
+                getContext().getLog().info(String.format("[Server %d] got client request", id));
+                break;
             case ServerRPC.RequestVoteResult r:
-                //getContext().getLog().info("[ServerRPC] echoing "+e.msg());
+                getContext().getLog().info(String.format("[Server %d] got vote result", id));
+                restartTimer();
+                break;
+            case ServerRPC.Timeout t:
+                getContext().getLog().info(String.format("[Server %d] timed out on term %d",
+                        id, currentTerm));
+                // set candidate state and try to become leader
+                // set new term
+                // vote for yourself
+                // wait for votes
+                timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
+                break;
+            case ServerRPC.Init i:
+                getContext().getLog().info(String.format("[Server %d] initializing",
+                        id));
+                timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
+                serverList = i.serverList();
+                for(ActorRef<ServerRPC> server : serverList) {
+                    nextIndexMap.put(server, 0);
+                }
                 break;
             case default:
                 return Behaviors.stopped();
         }
         // Keep the same message handling behavior
         return this;
+    }
+
+    private void restartTimer() {
+        timers.cancel(TIMER_KEY);
+        Random random = new Random();
+        int seconds = random.nextInt(7) + 2;
+        after = Duration.ofSeconds(seconds);
+        timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
     }
 
     private int getLogTerm(int prevLogIndex) {
@@ -148,6 +215,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
             e.printStackTrace();
         }
 
+        // TODO: check if index is equal to last index
        log.truncate(index);
 
         try {
