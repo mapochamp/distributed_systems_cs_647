@@ -79,6 +79,7 @@ public class Client extends AbstractBehavior<ClientRPC> {
                 if(r.leader() == null) {
                     restartTimer();
                 } else {
+                    getContext().getLog().info(String.format("[Client %d] request resend", id));
                     sendRequest(r.leader(), r.entry());
                 }
                 break;

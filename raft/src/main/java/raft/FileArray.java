@@ -21,6 +21,7 @@ public class FileArray {
     }
 
     public void readFile() throws IOException {
+        isModified = false;
         try (FileReader fileReader = new FileReader(file);
              BufferedReader bufferedReader = new BufferedReader(fileReader)) {
             String line;
@@ -41,7 +42,7 @@ public class FileArray {
     }
 
     public List<Integer> get(int index) {
-        if(lines.isEmpty() || index > lines.size()) {
+        if(lines.isEmpty() || index >= lines.size()) {
            return new ArrayList<>();
         }
         return lines.get(index);
@@ -68,8 +69,16 @@ public class FileArray {
         }
     }
 
+    public void clearFileContents() throws IOException {
+        try (FileWriter fileWriter = new FileWriter(file)) {
+            // Empty the file by overwriting it with an empty string
+            fileWriter.write("");
+        }
+    }
+
     public void close() throws IOException {
         if (isModified) {
+            clearFileContents();
             try (FileWriter fileWriter = new FileWriter(file);
                  BufferedWriter bufferedWriter = new BufferedWriter(fileWriter)) {
                 for (List<Integer> line : lines) {
@@ -80,6 +89,7 @@ public class FileArray {
                     bufferedWriter.newLine();
                 }
             }
+            isModified = false;
         }
     }
 }

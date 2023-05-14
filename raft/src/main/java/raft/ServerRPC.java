@@ -12,7 +12,7 @@ public sealed interface ServerRPC {
     // entries are stored as list of pairs (we use list as a pair). so its like
     // [ <entry, term> , <entry, term> , ... , <entry, term> ]
     public final record AppendEntries(int term, int leaderId, int prevLogIndex,
-                                      int prevLogTerm, List<List<Integer>> entries,
+                                      int prevLogTerm, List<Integer> entry,
                                       int leaderCommit,
                                       ActorRef<ServerRPC> sender )implements ServerRPC {}
     public final record AppendEntriesResult(int term, boolean success,
@@ -24,6 +24,7 @@ public sealed interface ServerRPC {
                                           ActorRef<ServerRPC> sender) implements  ServerRPC {}
 
     public final record ClientRequest(ActorRef<ClientRPC> sender, int entry) implements ServerRPC {}
+    public final record ClientRequestResult(int entry, boolean success) implements ServerRPC {}
     public final record Timeout() implements ServerRPC {}
     public final record Init(List<ActorRef<ServerRPC>> serverList) implements ServerRPC {}
     

@@ -10,6 +10,8 @@ import akka.actor.typed.javadsl.Receive;
 import akka.actor.typed.ActorSystem;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class RaftDemo {
@@ -26,6 +28,32 @@ public class RaftDemo {
             numServers = Integer.parseInt(args[0]);
             numClients = Integer.parseInt(args[1]);
         }
+        FileArray fileArray = new FileArray("testFile");
+        for (int i =0; i < 10; i++) {
+            //try {
+            //    fileArray.readFile();
+            //} catch (IOException e) {
+            //    e.printStackTrace();
+            //}
+
+            List<Integer> newLine = new ArrayList<>();
+            newLine.add(i);
+            newLine.add(i);
+            fileArray.add(newLine);
+
+            try {
+                fileArray.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        fileArray.truncate(2);
+        try {
+            fileArray.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         var orc = ActorSystem.create(Orchestrator.create(numServers, numClients), "java-akka");
         var done = false;
         var console = new BufferedReader(new InputStreamReader(System.in));
