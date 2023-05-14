@@ -39,8 +39,10 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.commitIndex = 0;
         this.lastApplied = 0;
         this.currentLeader = null;
+        this.lastVotedForTerm = 0;
         this.nextIndex = new ArrayList<>();
         this.matchIndex = new ArrayList<>();
+        this.serverList = new ArrayList<>();
         this.currentState = State.FOLLOWER;
         this.nextIndexMap = new HashMap<>();
         this.matchIndexMap = new HashMap<>();
@@ -64,6 +66,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
     int id;
     int currentTerm;
     int votedFor;
+    int lastVotedForTerm;
     List<Pair<Integer, Integer>> templog;
     List<ActorRef<ServerRPC>> serverList;
 
@@ -96,6 +99,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         // This style of switch statement is technically a preview feature in many versions of Java, so you'll need to compile with --enable-preview
         switch (msg) {
             // TODO: WHAT DO WE DO ON A HEARTBEAT OR INITTED MESSAGE WHERE THE ENTRIES ARE EMPTY?
+            // TODO: we need to do some bookeeping on who the current leader is for the client redirection
             case ServerRPC.AppendEntries a:
                 restartTimer();
                 if(a.term() > currentTerm) {
@@ -103,19 +107,30 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 }
                 getContext().getLog().info(String.format("[Server %d] received Append Entries Request " +
                         " term %d", id, a.term()));
+                // reply false if term < currentTerm
                 if(a.term() < currentTerm) {
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
                     break;
                     // TODO: do we need an out of bounds check here
+                    // reply false if log doesn't contain an entry at prevLogIndex
+                    // whose term matches prevLogTerm
+                } else if(a.entries().isEmpty()) { // if heartbeat don't do anything
+                    a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
+                            true, getContext().getSelf()));
+                    currentLeader = a.sender();
+                    break;
                 } else if(getLogTerm(a.prevLogIndex()) != a.prevLogTerm()) {
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
                     break;
+                    // if an existing entry conflicts with a  new one (same index
+                    // but different terms), delete the existing entry adn all that
+                    // follow it
                 } else if(getLogTerm(a.prevLogIndex()) == a.prevLogTerm()) {
                     getContext().getLog().info(String.format("[Server %d] conflict" +
                             " term %d", id, a.term()));
-                    int conflictIdx = conflictExists(a.entries(), a.prevLogIndex());
+                    int conflictIdx = conflictExists(a.entries().get(0), a.prevLogIndex());
                     if(conflictIdx != -1) {
                         deleteConflicts(conflictIdx);
                     }
@@ -132,7 +147,10 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 restartTimer();
                 getContext().getLog().info(String.format("[Server %d] got Append entries result", id));
                 // if we get a true and enough servers reply true then we increment commit index
-                // if we get a false then ...
+                // if we get a true then update our match index
+                // if we get true we have to check all the match indices against our logs and set
+                // them as committed them accordingly
+                // if we get a false then update decrement our next index
                 break;
             case ServerRPC.RequestVote r:
                 restartTimer();
@@ -142,35 +160,43 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 getContext().getLog().info(String.format("[Server %d] got Vote request", id));
                 // TODO: you can only vote once per term
                 // TODO: tie break on log length
-                if(r.term() < currentTerm) {
+                if(r.term() < currentTerm || currentState == State.CANDIDATE) {
                     r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
-                                                                    getContext().getSelf()));
+                                                                    id, getContext().getSelf()));
                     votedFor = 0;
+                    lastVotedForTerm = currentTerm;
                     break;
                 }
-                if(votedFor == 0  || votedFor == r.candidateId()) {
+                if((votedFor == 0  || votedFor == r.candidateId()) && lastVotedForTerm < currentTerm) {
                     if(getLogTerm(r.lastLogIndex()) <= r.lastLogTerm()) {
                         votedFor = r.candidateId();
+                        getContext().getLog().info(String.format("[Server %d] votes for %d. lastVotedForTerm = %d" +
+                                " currentTerm = %d  candidateTerm = %d", id, r.candidateId(), lastVotedForTerm, currentTerm,
+                        r.term()));
                         r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, true,
-                                getContext().getSelf()));
+                                id, getContext().getSelf()));
                         break;
                     }
                     r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
-                            getContext().getSelf()));
+                            id, getContext().getSelf()));
                 } else {
                     r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
-                            getContext().getSelf()));
+                            id, getContext().getSelf()));
                 }
+                lastVotedForTerm = currentTerm;
                 votedFor = 0;
                 break;
             case ServerRPC.RequestVoteResult r:
                 restartTimer();
-                getContext().getLog().info(String.format("[Server %d] got vote result", id));
-                votesReceived++;
-                if(votesReceived > (serverList.size()/2)) {
+                getContext().getLog().info(String.format("[Server %d] got vote result from %d", id, r.senderId()));
+                if(r.voteGranted()) {
+                    votesReceived++;
+                }
+                if(votesReceived > (serverList.size()/2) && currentState != State.LEADER) {
+                    getContext().getLog().info(String.format("[Server %d] IS NOW LEADER", id));
                     currentState = State.LEADER;
                     List<List<Integer>> entry = new ArrayList<>();
-                    // send heartbeat
+                    // send heartbeat (empty entry)
                     for(var server : serverList) {
                         server.tell(new ServerRPC.AppendEntries(currentTerm, id,
                                 lastApplied, getLogTerm(lastApplied), entry, commitIndex,
@@ -188,7 +214,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     // we only send one at a time. this is just simulating things
                     List<List<Integer>> entry = new ArrayList<>();
                     List<Integer> temp = new ArrayList<>();
-                    temp.add(c.entry(), currentTerm);
+                    temp.add(c.entry());
+                    temp.add(currentTerm);
                     entry.add(temp);
                     for(var server : serverList) {
                         server.tell(new ServerRPC.AppendEntries(currentTerm, id, lastApplied,
@@ -201,14 +228,16 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 if (currentState == State.LEADER) {
                     // reset timer to fixed number
                     restartTimer();
-                    // send heartbeat (empty append entries rpc)
+                    // TODO: send heartbeat (empty append entries rpc)
                 } else {
+                    votesReceived = 0; //reset votesReceived in case we were a candidate before
                     getContext().getLog().info(String.format("[Server %d] timed out on term %d",
                             id, currentTerm));
                     // set candidate state and try to become leader
                     currentState = State.CANDIDATE;
+                    getContext().getLog().info(String.format("[Server %d] IS NOW CANDIDATE", id));
                     // set new term
-                    currentTerm++;
+                    currentTerm += 1;
                     // vote for yourself
                     votedFor = id;
                     votesReceived = 1;
@@ -227,8 +256,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 getContext().getLog().info(String.format("[Server %d] initializing", id));
                 timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
                 serverList = i.serverList();
-                //TODO: remove ourselves from serverlist
-                removeFromServerList(this.serverList, getContext().getSelf());
+                // remove ourselves from serverlist
+                //removeFromServerList(this.serverList, getContext().getSelf());
                 for(ActorRef<ServerRPC> server : serverList) {
                     nextIndexMap.put(server, 0);
                     matchIndexMap.put(server, 0);
@@ -242,11 +271,21 @@ public class Server extends AbstractBehavior<ServerRPC>{
     }
 
     private void removeFromServerList(List<ActorRef<ServerRPC>> serverList, ActorRef<ServerRPC> serverToRemove) {
+        /*
         Iterator<ActorRef<ServerRPC>> iterator = serverList.iterator();
         while(iterator.hasNext()) {
             ActorRef<ServerRPC> entry = iterator.next();
             if(entry == serverToRemove) {
                 iterator.remove();
+            }
+        }
+         */
+        for(int i=0; i<serverList.size(); i++) {
+            ActorRef<ServerRPC> server = serverList.get(i);
+            if(server == serverToRemove) {
+                getContext().getLog().info(String.format("[Server %d] removing itself from list", id));
+                serverList.remove(i);
+                return;
             }
         }
     }
@@ -255,6 +294,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         currentTerm = newTerm;
         if(currentState != State.FOLLOWER) {
             currentState = State.FOLLOWER;
+            getContext().getLog().info(String.format("[Server %d] IS NOW FOLLOWER", id));
         }
     }
 
@@ -285,6 +325,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
         } catch (IOException e) {
             e.printStackTrace();
         }
+        if(entries.isEmpty()) {
+            return -1;
+        }
         return entries.get(1);
     }
 
@@ -307,21 +350,17 @@ public class Server extends AbstractBehavior<ServerRPC>{
 
     // TODO: we get index out of bounds when trying access things at the very beginning when
     // prev log index = 0 and we try to access a file with no lines.
-    private int conflictExists(List<List<Integer>> entries, int prevLogIndex) {
+    private int conflictExists(List<Integer> entry, int prevLogIndex) {
         try {
             log.readFile();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        int entriesIdx = 0;
-        for(int i = prevLogIndex + 1; i < log.size(); i++) {
-            var localEntries = log.get(i);
-            // if our term doesn't match the entry term
-            if(localEntries.get(1) != entries.get(entriesIdx).get(1)) {
-               return i;
-            }
-            entriesIdx++;
+        List<Integer> localEntries = log.get(prevLogIndex + 1);
+        // if our term doesn't match the entry term
+        if(localEntries.isEmpty() || localEntries.get(1) != entry.get(1)) {
+            return prevLogIndex+1;
         }
 
         try {

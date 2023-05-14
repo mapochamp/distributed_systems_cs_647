@@ -20,7 +20,7 @@ public sealed interface ServerRPC {
     public final record RequestVote(int term, int candidateId, int lastLogIndex,
                                     int lastLogTerm,
                                     ActorRef<ServerRPC> sender ) implements  ServerRPC {}
-    public final record RequestVoteResult(int term, boolean voteGranted,
+    public final record RequestVoteResult(int term, boolean voteGranted, int senderId,
                                           ActorRef<ServerRPC> sender) implements  ServerRPC {}
 
     public final record ClientRequest(ActorRef<ClientRPC> sender, int entry) implements ServerRPC {}

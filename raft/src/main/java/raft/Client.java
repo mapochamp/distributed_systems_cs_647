@@ -33,9 +33,11 @@ public class Client extends AbstractBehavior<ClientRPC> {
         this.timers = timers;
         this.after = after;
         this.id = id;
+        this.lastEntry = 0;
     }
 
     int id;
+    int lastEntry;
     private static final Object TIMER_KEY = new Object();
     private final TimerScheduler<ClientRPC> timers;
     private Duration after;
@@ -62,8 +64,9 @@ public class Client extends AbstractBehavior<ClientRPC> {
                 Random random = new Random();
                 int randomIndex = random.nextInt(serverList.size());
                 getContext().getLog().info(String.format("[Client %d] sending request %d",
-                        id, randomIndex));
-                sendRequest(serverList.get(randomIndex), randomIndex);
+                        id, randomIndex+1));
+                sendRequest(serverList.get(randomIndex), lastEntry);
+                lastEntry++;
                 break;
             case ClientRPC.RequestAck r:
                 getContext().getLog().info(String.format("[Client %d] request committed", id));

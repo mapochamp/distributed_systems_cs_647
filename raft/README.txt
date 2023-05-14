@@ -1,0 +1,1 @@
+1. We don't actually apply any entries because we're not actually doing any procedure calls to execute for the client.

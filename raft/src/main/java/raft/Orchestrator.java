@@ -66,7 +66,9 @@ public class Orchestrator extends AbstractBehavior<String> {
                 if(!initialized)  {
                     getContext().getLog().info("Initializing all servers");
                     for(ActorRef<ServerRPC> actorRef : ServerList) {
-                        actorRef.tell(new ServerRPC.Init(ServerList));
+                        List<ActorRef<ServerRPC>> copy = new ArrayList<ActorRef<ServerRPC>>(ServerList);
+                        copy.remove(actorRef);
+                        actorRef.tell(new ServerRPC.Init(copy));
                     }
                     getContext().getLog().info("Initializing all clients");
                     for(ActorRef<ClientRPC> actorRef : ClientList) {

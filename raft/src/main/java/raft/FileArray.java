@@ -41,6 +41,9 @@ public class FileArray {
     }
 
     public List<Integer> get(int index) {
+        if(lines.isEmpty() || index > lines.size()) {
+           return new ArrayList<>();
+        }
         return lines.get(index);
     }
 
@@ -61,8 +64,8 @@ public class FileArray {
     public void truncate(int index) {
         if(index >= 0 && index < lines.size()) {
             lines.subList(index, lines.size()).clear();
+            isModified = true;
         }
-        isModified = true;
     }
 
     public void close() throws IOException {
