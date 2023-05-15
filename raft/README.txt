@@ -26,3 +26,5 @@ causes the old leader that sent a heartbeat to decrement the nextIndex and resen
 the entry they had already committed.
 8. Sometimes when everybody is caught up and a follower who has never been leader before becomes leader, it will duplicate
 replicate. I think this is because nextIndex is 0 and the appendEntries prevIndex / lastApplied is not being checked or sent correctly
+9. Sometimes a client request gets infinitely redirected to a server that is a leader but the retry from the client happens right after an election
+and it loops like that forever.

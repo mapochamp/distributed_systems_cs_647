@@ -121,6 +121,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     // if we get an entry with prevLogIndex set to 0, we just apply it instead of sending false
                     //getContext().getLog().info(String.format("[Server %d] appending entries" + " term %d", id, a.term()));
                     appendNewEntries(a.entry());
+                    lastApplied++;
                     updateCommitIndexFollower(a.leaderCommit());
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             true, getContext().getSelf()));
@@ -140,8 +141,11 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     //getContext().getLog().info(String.format("[Server %d] conflict" + " term %d", id, a.term()));
                     int conflictIdx = conflictExists(a.entry(), a.prevLogIndex());
                     if(conflictIdx != -1) {
-                        deleteConflicts(conflictIdx);
+                        deleteConflicts(a.prevLogIndex());
+                    }
+                    if(getLogTerm(a.prevLogIndex()) == -1) {
                         appendNewEntries(a.entry());
+                        lastApplied++;
                     }
                     //getContext().getLog().info(String.format("[Server %d] appending entries" + " term %d", id, a.term()));
                     updateCommitIndexFollower(a.leaderCommit());
@@ -173,15 +177,15 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     //        commitIndex, getContext().getSelf()));
                     List<Integer> entry = new ArrayList<>();
                     for(var server : serverList) {
-                        if(nextIndexMap.get(server) == lastApplied+1) {
+                        if(nextIndexMap.get(server) == lastApplied) {
                             // if they're caught up just send a heart beat
                             server.tell(new ServerRPC.AppendEntries(currentTerm, id,
                                     lastApplied, getLogTerm(lastApplied), entry, commitIndex,
                                     getContext().getSelf()));
                         } else {
                             // if they aren't caught up then catch them up
-                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server),
-                                    getLogTerm(nextIndexMap.get(server)), getEntry(nextIndexMap.get(server)),
+                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server) - 1,
+                                    getLogTerm(nextIndexMap.get(server)-1), getEntry(nextIndexMap.get(server) - 1),
                                     commitIndex, getContext().getSelf()));
                         }
                     }
@@ -241,15 +245,15 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     List<Integer> entry = new ArrayList<>();
                     // send heartbeat (empty entry)
                     for(var server : serverList) {
-                        if(nextIndexMap.get(server) == lastApplied+1) {
+                        if(nextIndexMap.get(server) == lastApplied) {
                             // if they're caught up just send a heart beat
                             server.tell(new ServerRPC.AppendEntries(currentTerm, id,
                                     lastApplied, getLogTerm(lastApplied), entry, commitIndex,
                                     getContext().getSelf()));
                         } else {
                             // if they aren't caught up then catch them up
-                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server),
-                                    getLogTerm(nextIndexMap.get(server)), getEntry(nextIndexMap.get(server)),
+                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server) - 1,
+                                    getLogTerm(nextIndexMap.get(server)-1), getEntry(nextIndexMap.get(server) - 1),
                                     commitIndex, getContext().getSelf()));
                         }
                     }
@@ -270,9 +274,16 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     for(var server : serverList) {
                         // if the match index and our last applied don't match, don't resend a new request
                         //if(matchIndexMap.get(server) == lastApplied) {
-                        server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server),
-                                getLogTerm(nextIndexMap.get(server)), getEntry(nextIndexMap.get(server)),
-                                commitIndex, getContext().getSelf()));
+                        if(nextIndexMap.get(server) == lastApplied) {
+                            // if they're caught up just send a heart beat
+                            server.tell(new ServerRPC.AppendEntries(currentTerm, id,
+                                    lastApplied, getLogTerm(lastApplied), entry, commitIndex,
+                                    getContext().getSelf()));
+                        } else {
+                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server) - 1,
+                                    getLogTerm(nextIndexMap.get(server)-1), getEntry(nextIndexMap.get(server)-1),
+                                    commitIndex, getContext().getSelf()));
+                        }
                         //}
                     }
                     lastApplied++;
@@ -291,15 +302,15 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     //}
                     List<Integer> entry = new ArrayList<>();
                     for(var server : serverList) {
-                        if(nextIndexMap.get(server) == lastApplied+1) {
+                        if(nextIndexMap.get(server) == lastApplied) {
                             // if they're caught up just send a heart beat
                             server.tell(new ServerRPC.AppendEntries(currentTerm, id,
                                     lastApplied, getLogTerm(lastApplied), entry, commitIndex,
                                     getContext().getSelf()));
                         } else {
                             // if they aren't caught up then catch them up
-                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server),
-                                    getLogTerm(nextIndexMap.get(server)), getEntry(nextIndexMap.get(server)),
+                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server) - 1,
+                                    getLogTerm(nextIndexMap.get(server)-1), getEntry(nextIndexMap.get(server) - 1),
                                     commitIndex, getContext().getSelf()));
                         }
                     }
@@ -333,7 +344,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 timers.startSingleTimer(TIMER_KEY, new ServerRPC.Timeout(), after);
                 serverList = i.serverList();
                 for(ActorRef<ServerRPC> server : serverList) {
-                    nextIndexMap.put(server, 0);
+                    nextIndexMap.put(server, 1);
                     matchIndexMap.put(server, 0);
                 }
                 break;
@@ -355,12 +366,13 @@ public class Server extends AbstractBehavior<ServerRPC>{
     private void incrementNextIndex(ActorRef<ServerRPC> sender) {
         int nextIndex = nextIndexMap.get(sender);
         if(nextIndex < lastApplied) {
-            nextIndexMap.put(sender, nextIndex+1);
+            nextIndex++;
+            nextIndexMap.put(sender, nextIndex);
         }
     }
     private void decrementNextIndex(ActorRef<ServerRPC> sender) {
         int nextIndex = nextIndexMap.get(sender);
-        if(nextIndex != 0) {
+        if(nextIndex > 1) {
             nextIndexMap.put(sender, nextIndex-1);
         }
     }
