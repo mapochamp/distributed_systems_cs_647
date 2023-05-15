@@ -18,7 +18,7 @@ public sealed interface ServerRPC {
     public final record AppendEntriesResult(int term, boolean success,
                                             ActorRef<ServerRPC> sender) implements  ServerRPC {}
     public final record RequestVote(int term, int candidateId, int lastLogIndex,
-                                    int lastLogTerm,
+                                    int lastLogTerm, int logLength,
                                     ActorRef<ServerRPC> sender ) implements  ServerRPC {}
     public final record RequestVoteResult(int term, boolean voteGranted, int senderId,
                                           ActorRef<ServerRPC> sender) implements  ServerRPC {}

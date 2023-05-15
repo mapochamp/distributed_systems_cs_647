@@ -100,35 +100,29 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 }
                 // reply false if term < currentTerm
                 if(a.term() < currentTerm) {
-                    getContext().getLog().info(String.format("[Server %d] received Append Entries Request " +
-                            " term %d case 1", id, a.term()));
+                    //getContext().getLog().info(String.format("[Server %d] received Append Entries Request " + " term %d case 1", id, a.term()));
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
                     break;
-                    // TODO: do we need an out of bounds check here
                     // reply false if log doesn't contain an entry at prevLogIndex
                     // whose term matches prevLogTerm
                 } else if(a.entry().isEmpty()) { // if heartbeat don't do anything
-                    getContext().getLog().info(String.format("[Server %d] received Append Entries Request " +
-                            " term %d case 2", id, a.term()));
+                    //getContext().getLog().info(String.format("[Server %d] received Append Entries Request " + " term %d case 2", id, a.term()));
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             true, getContext().getSelf()));
                     currentLeader = a.sender();
                     break;
                 } else if(a.prevLogIndex() == 0) {
-                    getContext().getLog().info(String.format("[Server %d] received Append Entries Request " +
-                            " term %d case 3", id, a.term()));
+                    //getContext().getLog().info(String.format("[Server %d] received Append Entries Request " + " term %d case 3", id, a.term()));
                     // if we get an entry with prevLogIndex set to 0, we just apply it instead of sending false
-                    getContext().getLog().info(String.format("[Server %d] appending entries" +
-                            " term %d", id, a.term()));
+                    //getContext().getLog().info(String.format("[Server %d] appending entries" + " term %d", id, a.term()));
                     appendNewEntries(a.entry());
                     updateCommitIndexFollower(a.leaderCommit());
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             true, getContext().getSelf()));
                     break;
                 } else if(getLogTerm(a.prevLogIndex()) != a.prevLogTerm()) {
-                    getContext().getLog().info(String.format("[Server %d] received Append Entries Request " +
-                            " term %d case 4", id, a.term()));
+                    //getContext().getLog().info(String.format("[Server %d] received Append Entries Request " + " term %d case 4", id, a.term()));
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
                     break;
@@ -136,16 +130,13 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     // but different terms), delete the existing entry adn all that
                     // follow it
                 } else if(getLogTerm(a.prevLogIndex()) == a.prevLogTerm()) {
-                    getContext().getLog().info(String.format("[Server %d] received Append Entries Request " +
-                            " term %d case 5", id, a.term()));
-                    getContext().getLog().info(String.format("[Server %d] conflict" +
-                            " term %d", id, a.term()));
+                    //getContext().getLog().info(String.format("[Server %d] received Append Entries Request " + " term %d case 5", id, a.term()));
+                    //getContext().getLog().info(String.format("[Server %d] conflict" + " term %d", id, a.term()));
                     int conflictIdx = conflictExists(a.entry(), a.prevLogIndex());
                     if(conflictIdx != -1) {
                         deleteConflicts(conflictIdx);
                     }
-                    getContext().getLog().info(String.format("[Server %d] appending entries" +
-                            " term %d", id, a.term()));
+                    //getContext().getLog().info(String.format("[Server %d] appending entries" + " term %d", id, a.term()));
                     appendNewEntries(a.entry());
                     updateCommitIndexFollower(a.leaderCommit());
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
@@ -162,6 +153,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     incrementNextIndex(a.sender());
                     // if true and enough servers reply true then we increment commit index
                     updateCommitIndexLeader();
+                    // TODO: not sure whether we have to send another append entries message or wait for heartbeat
                 } else {
                     // if false then update decrement our next index
                     decrementNextIndex(a.sender());
@@ -176,8 +168,6 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     updateTerm(r.term());
                 }
                 //getContext().getLog().info(String.format("[Server %d] got Vote request", id));
-                // TODO: you can only vote once per term
-                // TODO: tie break on log length
                 if(r.term() < currentTerm || currentState == State.CANDIDATE) {
                     r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
                                                                     id, getContext().getSelf()));
@@ -187,15 +177,18 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 }
                 if((votedFor == 0  || votedFor == r.candidateId()) && lastVotedForTerm < currentTerm) {
                     if(getLogTerm(r.lastLogIndex()) <= r.lastLogTerm()) {
-                        votedFor = r.candidateId();
+                        if(r.logLength() >= log.size()) {
+                            votedFor = r.candidateId();
+                            //getContext().getLog().info(String.format("[Server %d] votes for %d. logsize = %d" + " candidateLogSize = %d", id, r.candidateId(), log.size(), r.logLength()));
                         /*
                         getContext().getLog().info(String.format("[Server %d] votes for %d. lastVotedForTerm = %d" +
                                 " currentTerm = %d  candidateTerm = %d", id, r.candidateId(), lastVotedForTerm, currentTerm,
                                     r.term()));
                          */
-                        r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, true,
-                                id, getContext().getSelf()));
-                        break;
+                            r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, true,
+                                    id, getContext().getSelf()));
+                            break;
+                        }
                     }
                     r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
                             id, getContext().getSelf()));
@@ -212,15 +205,28 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 if(r.voteGranted()) {
                     votesReceived++;
                 }
-                if(votesReceived > (serverList.size()/2) && currentState != State.LEADER) {
-                    getContext().getLog().info(String.format("[Server %d] IS NOW LEADER", id));
+                if(votesReceived > (serverList.size())/2 && currentState != State.LEADER) {
+                    if(serverList.size() == 1) {
+                        if(votesReceived != 2){
+                            break;
+                        }
+                    }
+                    //getContext().getLog().info(String.format("[Server %d] IS NOW LEADER, votes received = %d", id, votesReceived));
                     currentState = State.LEADER;
                     List<Integer> entry = new ArrayList<>();
                     // send heartbeat (empty entry)
                     for(var server : serverList) {
-                        server.tell(new ServerRPC.AppendEntries(currentTerm, id,
-                                lastApplied, getLogTerm(lastApplied), entry, commitIndex,
-                                getContext().getSelf()));
+                        if(nextIndexMap.get(server) == lastApplied+1) {
+                            // if they're caught up just send a heart beat
+                            server.tell(new ServerRPC.AppendEntries(currentTerm, id,
+                                    lastApplied, getLogTerm(lastApplied), entry, commitIndex,
+                                    getContext().getSelf()));
+                        } else {
+                            // if they aren't caught up then catch them up
+                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server),
+                                    getLogTerm(nextIndexMap.get(server)), getEntry(nextIndexMap.get(server)),
+                                    commitIndex, getContext().getSelf()));
+                        }
                     }
                 }
                 break;
@@ -228,24 +234,21 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 if(currentState == State.FOLLOWER) {
                     c.sender().tell(new ClientRPC.RequestReject(currentLeader, c.entry()));
                 } else {
-                    // TODO: we have to make sure that if we're currently catching up a node then we don't send it
                     // the entry data structure is meant to be able take multiple entries at once even though
                     // we only send one at a time. this is just simulating things
                     List<Integer> entry = new ArrayList<>();
                     entry.add(c.entry());
                     entry.add(currentTerm);
                     // append the entry to your own log first
-                    getContext().getLog().info(String.format("[Server %d] appending entries" +
-                            " term %d", id, currentTerm));
+                    //getContext().getLog().info(String.format("[Server %d] appending entries" + " term %d", id, currentTerm));
                     appendNewEntries(entry);
                     for(var server : serverList) {
                         // if the match index and our last applied don't match, don't resend a new request
-                        if(matchIndexMap.get(server) == lastApplied) {
-                            // TODO: out of bounds error for getLogTerm
-                            server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server),
-                                    getLogTerm(nextIndexMap.get(server)), getEntry(nextIndexMap.get(server)),
-                                    commitIndex, getContext().getSelf()));
-                        }
+                        //if(matchIndexMap.get(server) == lastApplied) {
+                        server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server),
+                                getLogTerm(nextIndexMap.get(server)), getEntry(nextIndexMap.get(server)),
+                                commitIndex, getContext().getSelf()));
+                        //}
                     }
                     lastApplied++;
                 }
@@ -256,6 +259,11 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     // reset timer to fixed number
                     restartTimer();
                     // TODO: send heartbeat (empty append entries rpc)
+                    for(var server : serverList) {
+                        server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server),
+                                getLogTerm(nextIndexMap.get(server)), getEntry(nextIndexMap.get(server)),
+                                commitIndex, getContext().getSelf()));
+                    }
                 } else {
                     votesReceived = 0; //reset votesReceived in case we were a candidate before
                     /*
@@ -276,7 +284,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     //getContext().getLog().info(String.format("[Server %d] starting to broadcasting vote", id));
                     for(var server : serverList) {
                         server.tell(new ServerRPC.RequestVote(currentTerm, id, lastApplied,
-                                getLogTerm(lastApplied), getContext().getSelf()));
+                                getLogTerm(lastApplied), log.size(), getContext().getSelf()));
                     }
                     //getContext().getLog().info(String.format("[Server %d] done broadcasting vote", id));
                 }
@@ -311,7 +319,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
     }
     private void decrementNextIndex(ActorRef<ServerRPC> sender) {
         int nextIndex = nextIndexMap.get(sender);
-        nextIndexMap.put(sender, nextIndex-1);
+        if(nextIndex != 0) {
+            nextIndexMap.put(sender, nextIndex-1);
+        }
     }
     private void restartTimer() {
         if(currentState != State.LEADER) {
@@ -327,14 +337,6 @@ public class Server extends AbstractBehavior<ServerRPC>{
     }
 
     private int getLogTerm(int prevLogIndex) {
-        /*
-        try {
-            log.readFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-         */
-
         var entry = log.get(prevLogIndex);
 
         try {
@@ -349,15 +351,6 @@ public class Server extends AbstractBehavior<ServerRPC>{
     }
 
     private List<Integer> getEntry(int logIndex) {
-        /*
-        try {
-            log.readFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-         */
-
         var entry = log.get(logIndex);
 
         try {
@@ -372,15 +365,6 @@ public class Server extends AbstractBehavior<ServerRPC>{
     }
 
     private void deleteConflicts(int index) {
-        /*
-        try {
-            log.readFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-         */
-
         // TODO: check if index is equal to last index
        log.truncate(index);
 
@@ -394,15 +378,6 @@ public class Server extends AbstractBehavior<ServerRPC>{
     // TODO: we get index out of bounds when trying access things at the very beginning when
     // prev log index = 0 and we try to access a file with no lines.
     private int conflictExists(List<Integer> entry, int prevLogIndex) {
-        /*
-        try {
-            log.readFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-         */
-
         List<Integer> localEntries = log.get(prevLogIndex + 1);
         // if our term doesn't match the entry term
         if(localEntries.isEmpty() || localEntries.get(1) != entry.get(1)) {
@@ -418,15 +393,6 @@ public class Server extends AbstractBehavior<ServerRPC>{
     }
 
     private void appendNewEntries(List<Integer> entry) {
-        /*
-        try {
-            log.readFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-         */
-
         List<Integer> newLine = new ArrayList<>();
         newLine.add(entry.get(0));
         newLine.add(entry.get(1));
@@ -443,6 +409,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
         if(leaderCommit > commitIndex) {
             commitIndex = Math.min(leaderCommit, log.size() - 1);
         }
+        if(commitIndex > lastApplied) {
+            lastApplied++;
+        }
     }
 
     private void updateCommitIndexLeader() {
@@ -457,6 +426,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
             // update our commit index
             if (matchCount > serverList.size() / 2) {
                 commitIndex = matchIndex;
+            }
+            if(commitIndex > lastApplied) {
+                lastApplied++;
             }
         }
         // Send commit to client
