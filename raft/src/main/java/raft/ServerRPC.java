@@ -29,4 +29,5 @@ public sealed interface ServerRPC {
     public final record Init(List<ActorRef<ServerRPC>> serverList) implements ServerRPC {}
     
     public final record End() implements ServerRPC {}
+    public final record Kill() implements ServerRPC {}
 }

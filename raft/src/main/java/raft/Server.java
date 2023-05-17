@@ -270,6 +270,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     matchIndexMap.put(server, 0);
                 }
                 break;
+            case ServerRPC.Kill k:
+                throw new RuntimeException("Simulated Failure");
             case default:
                 return Behaviors.stopped();
         }

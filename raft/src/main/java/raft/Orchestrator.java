@@ -6,10 +6,12 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
+import akka.actor.typed.SupervisorStrategy;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.time.Duration;
+import java.util.Random;
 
 
 public class Orchestrator extends AbstractBehavior<String> {
@@ -18,7 +20,9 @@ public class Orchestrator extends AbstractBehavior<String> {
             List<ActorRef<ServerRPC>> ServerList = new ArrayList<ActorRef<ServerRPC>>();
             List<ActorRef<ClientRPC>> ClientList = new ArrayList<ActorRef<ClientRPC>>();
             for(int i=1; i < numServers+1; i++) {
-                ServerList.add(context.spawn(Server.create(i), String.format("Server%d", i)));
+                Behavior<ServerRPC> supervisedServer = Behaviors.supervise(Server.create(i))
+                                .onFailure(SupervisorStrategy.restart());
+                ServerList.add(context.spawn(supervisedServer, String.format("Server%d", i)));
             }
             for(int i=1; i < numClients+1; i++) {
                 ClientList.add(context.spawn(Client.create(i, ServerList), String.format("Client%d", i)));
@@ -61,6 +65,16 @@ public class Orchestrator extends AbstractBehavior<String> {
                     actorRef.tell(new ClientRPC.End());
                 }
                 return Behaviors.stopped();
+            case "kill":
+                Random random = new Random();
+                int id = random.nextInt(ServerList.size() - 1);
+                getContext().getLog().info(String.format("Killing server %d", id));
+                var server = ServerList.get(id);
+                server.tell(new ServerRPC.Kill());
+                id = random.nextInt(ClientList.size() - 1);
+                var client = ClientList.get(id);
+                client.tell(new ClientRPC.Timeout());
+                break;
             default:
                 // TODO init. idk
                 if(!initialized)  {
