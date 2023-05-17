@@ -63,7 +63,7 @@ public class Client extends AbstractBehavior<ClientRPC> {
                 // get random server from server list
                 Random random = new Random();
                 int randomIndex = random.nextInt(serverList.size());
-                getContext().getLog().info(String.format("[Client %d] sending request %d",
+                getContext().getLog().info(String.format("[Client %d] sending request to server %d",
                         id, randomIndex+1));
                 sendRequest(serverList.get(randomIndex), lastEntry);
                 lastEntry++;

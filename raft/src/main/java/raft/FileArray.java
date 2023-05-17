@@ -22,6 +22,7 @@ public class FileArray {
 
     public void readFile() throws IOException {
         isModified = false;
+        lines = new ArrayList<>();
         try (FileReader fileReader = new FileReader(file);
              BufferedReader bufferedReader = new BufferedReader(fileReader)) {
             String line;
