@@ -75,6 +75,18 @@ public class Orchestrator extends AbstractBehavior<String> {
                 var client = ClientList.get(id);
                 client.tell(new ClientRPC.Timeout());
                 break;
+            case "unstable":
+                Random random1 = new Random();
+                int idx = random1.nextInt(ClientList.size()-1);
+                var requester = ClientList.get(idx);
+                requester.tell(new ClientRPC.UnstableReadRequest());
+                break;
+            case "stable":
+                Random random2 = new Random();
+                int index = random2.nextInt(ClientList.size()-1);
+                var stableClient = ClientList.get(index);
+                stableClient.tell(new ClientRPC.StableReadRequest());
+                break;
             default:
                 // TODO init. idk
                 if(!initialized)  {

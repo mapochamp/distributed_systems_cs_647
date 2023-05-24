@@ -40,6 +40,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.lastApplied = -1;
         this.currentLeader = null;
         this.lastVotedForTerm = 0;
+        this.state = 0;
         this.serverList = new ArrayList<>();
         this.currentState = State.FOLLOWER;
         this.nextIndexMap = new HashMap<>();
@@ -70,6 +71,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
 
     // Volatile state
     int commitIndex;
+    int state;
     int lastApplied;
     int votesReceived;
     State currentState;
@@ -104,25 +106,31 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     break;
                 }
                 if(a.term() < currentTerm) {
+                    // case 1
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
                     break;
                     // reply false if log doesn't contain an entry at prevLogIndex
                     // whose term matches prevLogTerm
                 } else if(a.entry().isEmpty()) { // if heartbeat don't do anything
+                    // case 2
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             true, getContext().getSelf()));
                     currentLeader = a.sender();
                     break;
                 } else if(a.prevLogIndex() == 0 && log.size() == 0) {
+                    // case 3
                     // if we get an entry with prevLogIndex set to 0, we just apply it instead of sending false
+                    getContext().getLog().info(String.format("[Server %d] writing %d to disk case 3", id, a.entry().get(0)));
                     appendNewEntries(a.entry());
+                    state += a.entry().get(0);
                     lastApplied++;
                     updateCommitIndexFollower(a.leaderCommit());
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             true, getContext().getSelf()));
                     break;
                 } else if(getLogTerm(a.prevLogIndex()) != a.prevLogTerm()) {
+                    // case 4
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
                     break;
@@ -130,12 +138,15 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     // but different terms), delete the existing entry adn all that
                     // follow it
                 } else if(getLogTerm(a.prevLogIndex()) == a.prevLogTerm()) {
+                    // case 5
                     int conflictIdx = conflictExists(a.entry(), a.prevLogIndex()+1);
                     if(conflictIdx != -1) {
                         deleteConflicts(a.prevLogIndex()+1);
                     }
                     if(getLogTerm(a.prevLogIndex()+1) == -1) {
+                        getContext().getLog().info(String.format("[Server %d] writing %d to disk case 5", id, a.entry().get(0)));
                         appendNewEntries(a.entry());
+                        recomputeState();
                         lastApplied++;
                     }
                     updateCommitIndexFollower(a.leaderCommit());
@@ -221,7 +232,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     sendAppendEntries();
                 }
                 break;
-            case ServerRPC.ClientRequest c:
+            case ServerRPC.ClientWriteRequest c:
                 if(currentState != State.LEADER) {
                     c.sender().tell(new ClientRPC.RequestReject(currentLeader, c.entry()));
                 } else {
@@ -231,11 +242,31 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     entry.add(c.entry());
                     entry.add(currentTerm);
                     // append the entry to your own log first
+                    getContext().getLog().info(String.format("[Server %d] writing %d to disk from client request", id, c.entry()));
                     appendNewEntries(entry);
+                    state += c.entry();
                     lastApplied++;
                     sendAppendEntries();
                 }
                 break;
+
+            case ServerRPC.ClientReadUnstableRequest c:
+                List<Integer> unstableEntry = getEntry(lastApplied);
+                boolean unstableEntryEmpty = unstableEntry.isEmpty();
+                c.sender().tell(new ClientRPC.UnstableReadRequestResult(state, unstableEntryEmpty));
+                break;
+
+            case ServerRPC.ClientReadStableRequest c:
+                List<Integer> stableEntry = getEntry(commitIndex);
+                boolean stableEntryEmpty = stableEntry.isEmpty();
+                if(currentState != State.LEADER) {
+                    c.sender().tell(new ClientRPC.StableReadRequestResult(state,
+                            true, false, currentLeader));
+                } else {
+                    c.sender().tell(new ClientRPC.StableReadRequestResult(state, stableEntryEmpty, true, currentLeader));
+                }
+                break;
+
             case ServerRPC.Timeout t:
                 if (currentState == State.LEADER) {
                     // reset timer to fixed number
@@ -461,6 +492,30 @@ public class Server extends AbstractBehavior<ServerRPC>{
                             commitIndex, getContext().getSelf()));
                 }
             }
+        }
+    }
+
+    private void recomputeState() {
+        try {
+            log.readFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        state = 0;
+        // get all entries
+        List<Integer> entry = new ArrayList<>();
+        int size = log.size();
+        for(int i=0; i<size; i++) {
+            entry = log.get(i);
+            if(!entry.isEmpty()) {
+                state+=entry.get(0);
+            }
+        }
+
+        try {
+            log.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 

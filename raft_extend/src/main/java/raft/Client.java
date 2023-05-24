@@ -83,6 +83,35 @@ public class Client extends AbstractBehavior<ClientRPC> {
                     sendRequest(r.leader(), r.entry());
                 }
                 break;
+            case ClientRPC.UnstableReadRequestResult r:
+                getContext().getLog().info(String.format("[Client %d] unstable read: %d", id, r.state()));
+                break;
+            case ClientRPC.StableReadRequestResult r:
+                if (r.success()) {
+                    getContext().getLog().info(String.format("[Client %d] stable read: %d", id, r.state()));
+                } else {
+                    getContext().getLog().info(String.format("[Client %d] request resend", id));
+                    if(r.leader() != null) {
+                        r.leader().tell(new ServerRPC.ClientReadStableRequest(getContext().getSelf()));
+                    }
+                }
+                break;
+            case ClientRPC.UnstableReadRequest r:
+                Random randomIdx = new Random();
+                int serverIdx = randomIdx.nextInt(serverList.size());
+                getContext().getLog().info(String.format("[Client %d] sending request to server %d",
+                        id, serverIdx+1));
+                var serverToReadFrom = serverList.get(serverIdx);
+                serverToReadFrom.tell(new ServerRPC.ClientReadUnstableRequest(getContext().getSelf()));
+                break;
+            case ClientRPC.StableReadRequest r:
+                Random idx = new Random();
+                int serverIndex = idx.nextInt(serverList.size());
+                getContext().getLog().info(String.format("[Client %d] sending request to server %d",
+                        id, serverIndex+1));
+                var serverStableRead = serverList.get(serverIndex);
+                serverStableRead.tell(new ServerRPC.ClientReadStableRequest(getContext().getSelf()));
+                break;
             case ClientRPC.Init i:
                 getContext().getLog().info(String.format("[Client %d] initializing", id));
                 timers.startSingleTimer(TIMER_KEY, new ClientRPC.Timeout(), after);
@@ -96,13 +125,13 @@ public class Client extends AbstractBehavior<ClientRPC> {
     private void restartTimer() {
         timers.cancel(TIMER_KEY);
         Random random = new Random();
-        int seconds = random.nextInt(5) + 1;
+        int seconds = random.nextInt(5);
         after = Duration.ofSeconds(seconds);
         timers.startSingleTimer(TIMER_KEY, new ClientRPC.Timeout(), after);
     }
 
     private void sendRequest(ActorRef<ServerRPC> server, int entry) {
-        server.tell(new ServerRPC.ClientRequest(getContext().getSelf(), entry));
+        server.tell(new ServerRPC.ClientWriteRequest(getContext().getSelf(), entry));
     }
 
 }
