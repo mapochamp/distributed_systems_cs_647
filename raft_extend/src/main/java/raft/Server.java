@@ -425,6 +425,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         List<Integer> newLine = new ArrayList<>();
         newLine.add(entry.get(0));
         newLine.add(entry.get(1));
+        getContext().getLog().info(String.format("[Server %d] entry %d term %d", id, entry.get(0), entry.get(1)));
         log.add(newLine);
 
         try {
@@ -476,8 +477,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
         for(var server : serverList) {
             if(nextIndexMap.get(server) == lastApplied) {
                 // if they're caught up just send a heart beat
-                server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server) - 1,
-                        getLogTerm(nextIndexMap.get(server) - 1), getEntry(lastApplied),
+                server.tell(new ServerRPC.AppendEntries(currentTerm, id, lastApplied-1,
+                        getLogTerm(lastApplied-1), getEntry(lastApplied),
                         commitIndex, getContext().getSelf()));
             } else {
                 // if they aren't caught up then catch them up

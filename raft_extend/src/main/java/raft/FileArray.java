@@ -43,7 +43,7 @@ public class FileArray {
     }
 
     public List<Integer> get(int index) {
-        if(lines.isEmpty() || index >= lines.size()) {
+        if(lines.isEmpty() || index >= lines.size() || index < 0) {
            return new ArrayList<>();
         }
         return lines.get(index);
