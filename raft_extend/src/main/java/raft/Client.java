@@ -33,11 +33,13 @@ public class Client extends AbstractBehavior<ClientRPC> {
         this.timers = timers;
         this.after = after;
         this.id = id;
+        this.serverId = id - 1;
         this.lastEntry = 0;
     }
 
     int id;
     int lastEntry;
+    int serverId;
     private static final Object TIMER_KEY = new Object();
     private final TimerScheduler<ClientRPC> timers;
     private Duration after;
@@ -59,14 +61,17 @@ public class Client extends AbstractBehavior<ClientRPC> {
             case ClientRPC.End e:
                 return Behaviors.stopped();
             case ClientRPC.Timeout t:
-                ActorRef<ServerRPC> server;
+                // TODO: make it so that we change servers instead of sending a request on timeout?
                 // get random server from server list
-                Random random = new Random();
-                int randomIndex = random.nextInt(serverList.size());
-                getContext().getLog().info(String.format("[Client %d] sending request to server %d",
-                        id, randomIndex+1));
-                sendRequest(serverList.get(randomIndex), lastEntry);
-                lastEntry++;
+                //Random random = new Random();
+                //int randomTicketcount = random.nextInt(5)+1;
+                //getContext().getLog().info(String.format("[Client %d] sending request to server %d",
+                //        id, randomIndex+1));
+                // read the number of tickets available first
+                var server = serverList.get(serverId);
+                server.tell(new ServerRPC.ClientReadUnstableRequest(getContext().getSelf()));
+                //sendRequest(serverList.get(serverId), randomTicketcount);
+                restartTimer();
                 break;
             case ClientRPC.RequestAck r:
                 getContext().getLog().info(String.format("[Client %d] request committed", id));
@@ -76,15 +81,20 @@ public class Client extends AbstractBehavior<ClientRPC> {
             case ClientRPC.RequestReject r:
                 // we didn't send it to the leader so send it to the leader
                 getContext().getLog().info(String.format("[Client %d] request rejected", id));
-                if(r.leader() == null) {
-                    restartTimer();
-                } else {
+                if(r.leader() != null && r.success()) {
                     getContext().getLog().info(String.format("[Client %d] request resend", id));
                     sendRequest(r.leader(), r.entry());
-                }
+                    restartTimer();
+                } // else there are no tickets left
                 break;
             case ClientRPC.UnstableReadRequestResult r:
                 getContext().getLog().info(String.format("[Client %d] unstable read: %d", id, r.state()));
+                Random random = new Random();
+                int randomTicketcount = random.nextInt(r.state())+1;
+                getContext().getLog().info(String.format("[Client %d] sending request to buy %d tix to server %d",
+                        id, randomTicketcount, serverId));
+                serverList.get(serverId).tell(new ServerRPC.ClientWriteRequest(getContext().getSelf(),
+                        randomTicketcount));
                 break;
             case ClientRPC.StableReadRequestResult r:
                 if (r.success()) {
@@ -95,21 +105,14 @@ public class Client extends AbstractBehavior<ClientRPC> {
                         r.leader().tell(new ServerRPC.ClientReadStableRequest(getContext().getSelf()));
                     }
                 }
+                restartTimer();
                 break;
             case ClientRPC.UnstableReadRequest r:
-                Random randomIdx = new Random();
-                int serverIdx = randomIdx.nextInt(serverList.size());
-                getContext().getLog().info(String.format("[Client %d] sending request to server %d",
-                        id, serverIdx+1));
-                var serverToReadFrom = serverList.get(serverIdx);
+                var serverToReadFrom = serverList.get(serverId);
                 serverToReadFrom.tell(new ServerRPC.ClientReadUnstableRequest(getContext().getSelf()));
                 break;
             case ClientRPC.StableReadRequest r:
-                Random idx = new Random();
-                int serverIndex = idx.nextInt(serverList.size());
-                getContext().getLog().info(String.format("[Client %d] sending request to server %d",
-                        id, serverIndex+1));
-                var serverStableRead = serverList.get(serverIndex);
+                var serverStableRead = serverList.get(serverId);
                 serverStableRead.tell(new ServerRPC.ClientReadStableRequest(getContext().getSelf()));
                 break;
             case ClientRPC.Init i:

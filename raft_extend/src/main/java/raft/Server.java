@@ -40,7 +40,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.lastApplied = -1;
         this.currentLeader = null;
         this.lastVotedForTerm = 0;
-        this.state = 0;
+        this.state = 20;
         this.serverList = new ArrayList<>();
         this.currentState = State.FOLLOWER;
         this.nextIndexMap = new HashMap<>();
@@ -234,7 +234,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 break;
             case ServerRPC.ClientWriteRequest c:
                 if(currentState != State.LEADER) {
-                    c.sender().tell(new ClientRPC.RequestReject(currentLeader, c.entry()));
+                    c.sender().tell(new ClientRPC.RequestReject(currentLeader, c.entry(), true));
                 } else {
                     // the entry data structure is meant to be able take multiple entries at once even though
                     // we only send one at a time. this is just simulating things
