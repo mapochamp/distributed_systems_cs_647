@@ -190,6 +190,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                             votedFor = r.candidateId();
                             r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, true,
                                     id, getContext().getSelf()));
+                            currentState = State.FOLLOWER;
                             break;
                         } else {
                             r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
@@ -202,6 +203,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                             votedFor = r.candidateId();
                             r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, true,
                                     id, getContext().getSelf()));
+                            currentState = State.FOLLOWER;
                             break;
                         }
                     }

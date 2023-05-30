@@ -50,12 +50,9 @@ public class Orchestrator extends AbstractBehavior<String> {
                 .build();
     }
 
-    // TODO: restart/kill servers
     public Behavior<String> dispatch(String txt) {
         getContext().getLog().info("[Orchestrator] received "+txt);
         switch (txt) {
-            // TODO: case for setting timeout interval upperbound
-            // TODO: case for setting heart beat interval
             // The Scala version uses a different type here, and essentially uses Behavior<Object>.
             case "shutdown":
                 for(ActorRef<ServerRPC> actorRef : ServerList) {
@@ -88,7 +85,6 @@ public class Orchestrator extends AbstractBehavior<String> {
                 stableClient.tell(new ClientRPC.StableReadRequest());
                 break;
             default:
-                // TODO init. idk
                 if(!initialized)  {
                     getContext().getLog().info("Initializing all servers");
                     for(ActorRef<ServerRPC> actorRef : ServerList) {
@@ -100,6 +96,7 @@ public class Orchestrator extends AbstractBehavior<String> {
                     for(ActorRef<ClientRPC> actorRef : ClientList) {
                         actorRef.tell(new ClientRPC.Init());
                     }
+                    initialized = true;
                 } else  {
                     for(ActorRef<ServerRPC> actorRef : ServerList) {
                         actorRef.tell(new ServerRPC.End());
