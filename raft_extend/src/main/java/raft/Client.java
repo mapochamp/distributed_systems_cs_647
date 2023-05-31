@@ -19,7 +19,7 @@ public class Client extends AbstractBehavior<ClientRPC> {
         return Behaviors.setup(context ->
                 Behaviors.withTimers(timers -> {
                     Random random = new Random();
-                    int seconds = random.nextInt(5) + 1;
+                    int seconds = random.nextInt(15) + 30;
                     Duration after = Duration.ofSeconds(seconds);
                     return new Client(context, timers,after, id, serverList);
                 })
@@ -61,16 +61,15 @@ public class Client extends AbstractBehavior<ClientRPC> {
             case ClientRPC.End e:
                 return Behaviors.stopped();
             case ClientRPC.Timeout t:
-                // TODO: make it so that we change servers instead of sending a request on timeout?
-                // get random server from server list
-                //Random random = new Random();
-                //int randomTicketcount = random.nextInt(5)+1;
-                //getContext().getLog().info(String.format("[Client %d] sending request to server %d",
-                //        id, randomIndex+1));
-                // read the number of tickets available first
+                // kill our server and rediscover
+                getContext().getLog().info(String.format("[Client %d] Timed out, now killing server", id));
                 var server = serverList.get(serverId);
-                //server.tell(new ServerRPC.ClientReadUnstableRequest(getContext().getSelf()));
-                //sendRequest(serverList.get(serverId), randomTicketcount);
+                server.tell(new ServerRPC.Kill());
+                serverList.remove(serverId);
+                Random random = new Random();
+                // pick a random new server that we assume is up and wasn't our last server
+                int newServerId = random.nextInt(serverList.size()-1);
+                serverId = newServerId;
                 restartTimer();
                 break;
             case ClientRPC.RequestAck r:
@@ -91,6 +90,7 @@ public class Client extends AbstractBehavior<ClientRPC> {
                 getContext().getLog().info(String.format("[Client %d] unstable read: %d", id, r.state()));
                 // buy tickets
                 buyTickets(r.state());
+                restartTimer();
                 break;
             case ClientRPC.StableReadRequestResult r:
                 if (r.success()) {
@@ -107,10 +107,13 @@ public class Client extends AbstractBehavior<ClientRPC> {
             case ClientRPC.UnstableReadRequest r:
                 var serverToReadFrom = serverList.get(serverId);
                 serverToReadFrom.tell(new ServerRPC.ClientReadUnstableRequest(getContext().getSelf()));
+                restartTimer();
                 break;
             case ClientRPC.StableReadRequest r:
+                // ask our server for a stable read and get redirected if our server isn't the leader
                 var serverStableRead = serverList.get(serverId);
                 serverStableRead.tell(new ServerRPC.ClientReadStableRequest(getContext().getSelf()));
+                restartTimer();
                 break;
             case ClientRPC.Init i:
                 getContext().getLog().info(String.format("[Client %d] initializing", id));
@@ -125,7 +128,7 @@ public class Client extends AbstractBehavior<ClientRPC> {
     private void restartTimer() {
         timers.cancel(TIMER_KEY);
         Random random = new Random();
-        int seconds = random.nextInt(5);
+        int seconds = random.nextInt(15)+30;
         after = Duration.ofSeconds(seconds);
         timers.startSingleTimer(TIMER_KEY, new ClientRPC.Timeout(), after);
     }

@@ -245,11 +245,19 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 } else {
                     // the entry data structure is meant to be able take multiple entries at once even though
                     // we only send one at a time. this is just simulating things
+
+                    // Don't allow client to buy more tickets than exist
+                    if(c.entry() > stableState || c.entry() > unstableState) {
+                        // send requestReject to client
+                        break;
+                    }
+
                     List<Integer> entry = new ArrayList<>();
                     entry.add(c.entry());
                     entry.add(currentTerm);
+
                     // append the entry to your own log first
-                    getContext().getLog().info(String.format("[Server %d] writing %d to disk from client request", id, c.entry()));
+                    getContext().getLog().info(String.format("[Server %d] writing %d - %d to disk from client request", id, stableState, c.entry()));
                     appendNewEntries(entry);
                     stableState = recomputeState(true);
                     unstableState = recomputeState(false);
@@ -433,7 +441,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         List<Integer> newLine = new ArrayList<>();
         newLine.add(entry.get(0));
         newLine.add(entry.get(1));
-        getContext().getLog().info(String.format("[Server %d] entry %d term %d", id, entry.get(0), entry.get(1)));
+        //getContext().getLog().info(String.format("[Server %d] entry %d term %d", id, entry.get(0), entry.get(1)));
         log.add(newLine);
 
         try {
@@ -485,6 +493,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         for(var server : serverList) {
             if(nextIndexMap.get(server) == lastApplied) {
                 // if they're caught up just send a heart beat
+                getContext().getLog().info(String.format("[Server %d] sending heartbeat", id));
                 server.tell(new ServerRPC.AppendEntries(currentTerm, id, lastApplied-1,
                         getLogTerm(lastApplied-1), getEntry(lastApplied),
                         commitIndex, getContext().getSelf()));
@@ -504,7 +513,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         }
     }
 
-    private int recomputeState(boolean stable) {
+    private int recomputeState(boolean isStable) {
         try {
             log.readFile();
         } catch (IOException e) {
@@ -514,7 +523,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         int index = 0;
         List<Integer> entry = new ArrayList<>();
 
-        if(stable) {
+        if(isStable) {
             // read only up to the commit index if we're doing a consistent read
             index = commitIndex;
         } else {

@@ -68,9 +68,9 @@ public class Orchestrator extends AbstractBehavior<String> {
                 getContext().getLog().info(String.format("Killing server %d", id));
                 var server = ServerList.get(id);
                 server.tell(new ServerRPC.Kill());
-                id = random.nextInt(ClientList.size() - 1);
-                var client = ClientList.get(id);
-                client.tell(new ClientRPC.Timeout());
+                //id = random.nextInt(ClientList.size() - 1);
+                //var client = ClientList.get(id);
+                //client.tell(new ClientRPC.Timeout());
                 break;
             case "unstable":
                 Random random1 = new Random();
