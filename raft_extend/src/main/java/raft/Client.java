@@ -69,7 +69,7 @@ public class Client extends AbstractBehavior<ClientRPC> {
                 //        id, randomIndex+1));
                 // read the number of tickets available first
                 var server = serverList.get(serverId);
-                server.tell(new ServerRPC.ClientReadUnstableRequest(getContext().getSelf()));
+                //server.tell(new ServerRPC.ClientReadUnstableRequest(getContext().getSelf()));
                 //sendRequest(serverList.get(serverId), randomTicketcount);
                 restartTimer();
                 break;
@@ -89,16 +89,13 @@ public class Client extends AbstractBehavior<ClientRPC> {
                 break;
             case ClientRPC.UnstableReadRequestResult r:
                 getContext().getLog().info(String.format("[Client %d] unstable read: %d", id, r.state()));
-                Random random = new Random();
-                int randomTicketcount = random.nextInt(r.state())+1;
-                getContext().getLog().info(String.format("[Client %d] sending request to buy %d tix to server %d",
-                        id, randomTicketcount, serverId));
-                serverList.get(serverId).tell(new ServerRPC.ClientWriteRequest(getContext().getSelf(),
-                        randomTicketcount));
+                // buy tickets
+                buyTickets(r.state());
                 break;
             case ClientRPC.StableReadRequestResult r:
                 if (r.success()) {
                     getContext().getLog().info(String.format("[Client %d] stable read: %d", id, r.state()));
+                    buyTickets(r.state());
                 } else {
                     getContext().getLog().info(String.format("[Client %d] request resend", id));
                     if(r.leader() != null) {
@@ -131,6 +128,18 @@ public class Client extends AbstractBehavior<ClientRPC> {
         int seconds = random.nextInt(5);
         after = Duration.ofSeconds(seconds);
         timers.startSingleTimer(TIMER_KEY, new ClientRPC.Timeout(), after);
+    }
+
+    private void buyTickets(int ticketsLeft) {
+        if(ticketsLeft == 0) {
+            return;
+        }
+        Random random = new Random();
+        int randomTicketcount = random.nextInt(ticketsLeft)+1;
+        getContext().getLog().info(String.format("[Client %d] sending request to buy %d tix to server %d",
+                id, randomTicketcount, serverId));
+        serverList.get(serverId).tell(new ServerRPC.ClientWriteRequest(getContext().getSelf(),
+                randomTicketcount));
     }
 
     private void sendRequest(ActorRef<ServerRPC> server, int entry) {
