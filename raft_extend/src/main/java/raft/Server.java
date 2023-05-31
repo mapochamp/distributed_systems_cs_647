@@ -40,7 +40,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.lastApplied = -1;
         this.currentLeader = null;
         this.lastVotedForTerm = 0;
-        this.state = 20;
+        this.stableState = 20;
+        this.unstableState = 20;
         this.serverList = new ArrayList<>();
         this.currentState = State.FOLLOWER;
         this.nextIndexMap = new HashMap<>();
@@ -71,7 +72,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
 
     // Volatile state
     int commitIndex;
-    int state;
+    // The state machine we apply log entries to
+    int stableState;
+    int unstableState;
     int lastApplied;
     int votesReceived;
     State currentState;
@@ -123,7 +126,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     // if we get an entry with prevLogIndex set to 0, we just apply it instead of sending false
                     getContext().getLog().info(String.format("[Server %d] writing %d to disk case 3", id, a.entry().get(0)));
                     appendNewEntries(a.entry());
-                    state += a.entry().get(0);
+                    stableState = recomputeState(true);
+                    unstableState = recomputeState(false);
                     lastApplied++;
                     updateCommitIndexFollower(a.leaderCommit());
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
@@ -146,7 +150,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     if(getLogTerm(a.prevLogIndex()+1) == -1) {
                         getContext().getLog().info(String.format("[Server %d] writing %d to disk case 5", id, a.entry().get(0)));
                         appendNewEntries(a.entry());
-                        recomputeState();
+                        stableState = recomputeState(true);
+                        unstableState = recomputeState(false);
                         lastApplied++;
                     }
                     updateCommitIndexFollower(a.leaderCommit());
@@ -246,7 +251,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     // append the entry to your own log first
                     getContext().getLog().info(String.format("[Server %d] writing %d to disk from client request", id, c.entry()));
                     appendNewEntries(entry);
-                    state += c.entry();
+                    stableState = recomputeState(true);
+                    unstableState = recomputeState(false);
                     lastApplied++;
                     sendAppendEntries();
                 }
@@ -255,17 +261,17 @@ public class Server extends AbstractBehavior<ServerRPC>{
             case ServerRPC.ClientReadUnstableRequest c:
                 List<Integer> unstableEntry = getEntry(lastApplied);
                 boolean unstableEntryEmpty = unstableEntry.isEmpty();
-                c.sender().tell(new ClientRPC.UnstableReadRequestResult(state, unstableEntryEmpty));
+                c.sender().tell(new ClientRPC.UnstableReadRequestResult(unstableState, unstableEntryEmpty));
                 break;
 
             case ServerRPC.ClientReadStableRequest c:
                 List<Integer> stableEntry = getEntry(commitIndex);
                 boolean stableEntryEmpty = stableEntry.isEmpty();
                 if(currentState != State.LEADER) {
-                    c.sender().tell(new ClientRPC.StableReadRequestResult(state,
+                    c.sender().tell(new ClientRPC.StableReadRequestResult(stableState,
                             true, false, currentLeader));
                 } else {
-                    c.sender().tell(new ClientRPC.StableReadRequestResult(state, stableEntryEmpty, true, currentLeader));
+                    c.sender().tell(new ClientRPC.StableReadRequestResult(stableState, stableEntryEmpty, true, currentLeader));
                 }
                 break;
 
@@ -498,20 +504,27 @@ public class Server extends AbstractBehavior<ServerRPC>{
         }
     }
 
-    private void recomputeState() {
+    private int recomputeState(boolean stable) {
         try {
             log.readFile();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        state = 0;
-        // get all entries
+        int state = 20;
+        int index = 0;
         List<Integer> entry = new ArrayList<>();
-        int size = log.size();
-        for(int i=0; i<size; i++) {
+
+        if(stable) {
+            // read only up to the commit index if we're doing a consistent read
+            index = commitIndex;
+        } else {
+            // get all entries if we're doing an inconsistent read
+            index = log.size();
+        }
+        for(int i=0; i<index; i++) {
             entry = log.get(i);
             if(!entry.isEmpty()) {
-                state+=entry.get(0);
+                state-=entry.get(0);
             }
         }
 
@@ -520,6 +533,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return state;
     }
 
     public record Pair<X, Y>(X first, Y second) {
