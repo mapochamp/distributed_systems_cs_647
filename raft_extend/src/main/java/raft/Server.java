@@ -40,8 +40,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.lastApplied = -1;
         this.currentLeader = null;
         this.lastVotedForTerm = 0;
-        this.stableState = 20;
-        this.unstableState = 20;
+        this.stableState = 100;
+        this.unstableState = 100;
         this.serverList = new ArrayList<>();
         this.currentState = State.FOLLOWER;
         this.nextIndexMap = new HashMap<>();
@@ -319,6 +319,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 break;
             case ServerRPC.Kill k:
                 throw new RuntimeException("Simulated Failure");
+            case ServerRPC.PingServer p:
+                p.sender().tell(new ClientRPC.PingServerResponse());
+                break;
             case default:
                 return Behaviors.stopped();
         }
@@ -519,7 +522,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         } catch (IOException e) {
             e.printStackTrace();
         }
-        int state = 20;
+        int state = 100;
         int index = 0;
         List<Integer> entry = new ArrayList<>();
 

@@ -22,4 +22,5 @@ public interface ClientRPC {
     public final record UnstableReadRequestResult(int state, boolean isEmpty) implements ClientRPC {}
     public final record StableReadRequestResult(int state, boolean isEmpty, boolean success, ActorRef<ServerRPC> leader) implements ClientRPC {}
     public final record RequestReject(ActorRef<ServerRPC> leader, int entry, boolean success) implements ClientRPC {}
+    public final record PingServerResponse() implements ClientRPC {}
 }

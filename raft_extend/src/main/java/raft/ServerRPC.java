@@ -32,4 +32,5 @@ public sealed interface ServerRPC {
     
     public final record End() implements ServerRPC {}
     public final record Kill() implements ServerRPC {}
+    public final record PingServer(ActorRef<ClientRPC> sender) implements ServerRPC {}
 }

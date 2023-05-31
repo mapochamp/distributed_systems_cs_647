@@ -10,23 +10,22 @@ import akka.actor.typed.javadsl.TimerScheduler;
 import java.time.Duration;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 
 
-public class Client extends AbstractBehavior<ClientRPC> {
+public class StressTestClient extends AbstractBehavior<ClientRPC> {
     public static Behavior<ClientRPC> create(int id, List<ActorRef<ServerRPC>> serverList) {
         return Behaviors.setup(context ->
                 Behaviors.withTimers(timers -> {
                     Random random = new Random();
                     int seconds = random.nextInt(15) + 30;
                     Duration after = Duration.ofSeconds(seconds);
-                    return new Client(context, timers,after, id, serverList);
+                    return new StressTestClient(context, timers,after, id, serverList);
                 })
         );
     }
 
-    private Client(ActorContext ctxt, TimerScheduler<ClientRPC> timers,
+    private StressTestClient(ActorContext ctxt, TimerScheduler<ClientRPC> timers,
                    Duration after, int id, List<ActorRef<ServerRPC>> serverList) {
         super(ctxt);
         this.serverList = serverList;
@@ -65,46 +64,8 @@ public class Client extends AbstractBehavior<ClientRPC> {
             case ClientRPC.End e:
                 return Behaviors.stopped();
             case ClientRPC.Timeout t:
-                /***********************************************
-                 *  COMMENT OUT BELOW FOR INTERACTIVE MODE. KEEP FOR STRESS TEST
-                 ***********************************************/
                 restartTimer();
                 break;
-                /***********************************************
-                 *  COMMENT OUT ABOVE FOR INTERACTIVE MODE. KEEP FOR STRESS TEST
-                 ***********************************************/
-                // kill our server
-
-            /***********************************************
-             *  REMOVE COMMENT BLOCK BELOW FOR INTERACTIVE MODE. KEEP FOR STRESS TEST
-             ***********************************************/
-            /*
-                getContext().getLog().info(String.format("[Client %d] Timed out, now killing server", id));
-                var server = serverList.get(serverId);
-                server.tell(new ServerRPC.Kill());
-                // discover new alive servers
-                Random random = new Random();
-                // if we timed out then:
-                // if our original server died go look for a new server that is alive
-                // if we migrated to a new server and the new server died, go back to the old server
-                if(usingClosestServer) {
-                    // pick a random new server that we assume is up and is not our closest server
-                    // if we choose a dead server, then we'll time out again and look for another one
-                    int newServerId = random.nextInt(serverList.size() - 1);
-                    while (newServerId == oldServer) {
-                        newServerId = random.nextInt(serverList.size() - 1);
-                    }
-                    serverId = newServerId;
-                    server = serverList.get(serverId);
-                    server.tell(new ServerRPC.PingServer(getContext().getSelf()));
-                    usingClosestServer = false;
-                } else {
-                    usingClosestServer = true;
-                    serverId = oldServer;
-                }
-                restartTimer();
-                break;
-             */
             case ClientRPC.PingServerResponse p:
                 restartTimer();
                 break;

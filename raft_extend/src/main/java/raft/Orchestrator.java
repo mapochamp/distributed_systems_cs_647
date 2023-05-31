@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.time.Duration;
 import java.util.Random;
+import java.util.*;
 
 
 public class Orchestrator extends AbstractBehavior<String> {
@@ -19,6 +20,7 @@ public class Orchestrator extends AbstractBehavior<String> {
         return Behaviors.setup(context -> {
             List<ActorRef<ServerRPC>> ServerList = new ArrayList<ActorRef<ServerRPC>>();
             List<ActorRef<ClientRPC>> ClientList = new ArrayList<ActorRef<ClientRPC>>();
+            List<ActorRef<ClientRPC>> StressClientList = new ArrayList<ActorRef<ClientRPC>>();
             for(int i=1; i < numServers+1; i++) {
                 Behavior<ServerRPC> supervisedServer = Behaviors.supervise(Server.create(i))
                                 .onFailure(SupervisorStrategy.restart());
@@ -27,20 +29,26 @@ public class Orchestrator extends AbstractBehavior<String> {
             for(int i=1; i < numClients+1; i++) {
                 ClientList.add(context.spawn(Client.create(i, ServerList), String.format("Client%d", i)));
             }
-            return new Orchestrator(context, ServerList, ClientList);
+            for(int i=1; i < numClients+1; i++) {
+                StressClientList.add(context.spawn(StressTestClient.create(i, ServerList), String.format("StressClient%d", i)));
+            }
+            return new Orchestrator(context, ServerList, ClientList, StressClientList);
         });
     }
 
     private List<ActorRef<ServerRPC>> ServerList;
     private List<ActorRef<ClientRPC>> ClientList;
+    private List<ActorRef<ClientRPC>> StressClientList;
     private boolean initialized;
 
     private Orchestrator(ActorContext context,
                          List<ActorRef<ServerRPC>> ServerList,
-                         List<ActorRef<ClientRPC>> ClientList) {
+                         List<ActorRef<ClientRPC>> ClientList,
+                         List<ActorRef<ClientRPC>> StressClientList) {
         super(context);
         this.ServerList = ServerList;
         this.ClientList = ClientList;
+        this.StressClientList = StressClientList;
         this.initialized = false;
     }
     @Override
@@ -50,7 +58,7 @@ public class Orchestrator extends AbstractBehavior<String> {
                 .build();
     }
 
-    public Behavior<String> dispatch(String txt) {
+    public Behavior<String> dispatch(String txt) throws InterruptedException {
         getContext().getLog().info("[Orchestrator] received "+txt);
         switch (txt) {
             // The Scala version uses a different type here, and essentially uses Behavior<Object>.
@@ -84,6 +92,14 @@ public class Orchestrator extends AbstractBehavior<String> {
                 var stableClient = ClientList.get(index);
                 stableClient.tell(new ClientRPC.StableReadRequest());
                 break;
+            case "stress":
+                for(int i = 0; i < 20; i++) {
+                    java.util.concurrent.TimeUnit.SECONDS.sleep(1);
+                    for(ActorRef<ClientRPC> actorRef : StressClientList) {
+                        actorRef.tell(new ClientRPC.UnstableReadRequest());
+                    }
+                }
+                break;
             default:
                 if(!initialized)  {
                     getContext().getLog().info("Initializing all servers");
@@ -94,6 +110,10 @@ public class Orchestrator extends AbstractBehavior<String> {
                     }
                     getContext().getLog().info("Initializing all clients");
                     for(ActorRef<ClientRPC> actorRef : ClientList) {
+                        actorRef.tell(new ClientRPC.Init());
+                    }
+                    getContext().getLog().info("Initializing all stress test clients");
+                    for(ActorRef<ClientRPC> actorRef : StressClientList) {
                         actorRef.tell(new ClientRPC.Init());
                     }
                     initialized = true;
