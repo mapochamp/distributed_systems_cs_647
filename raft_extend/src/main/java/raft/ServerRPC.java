@@ -23,11 +23,14 @@ public sealed interface ServerRPC {
     public final record RequestVoteResult(int term, boolean voteGranted, int senderId,
                                           ActorRef<ServerRPC> sender) implements  ServerRPC {}
 
-    public final record ClientRequest(ActorRef<ClientRPC> sender, int entry) implements ServerRPC {}
-    public final record ClientRequestResult(int entry, boolean success) implements ServerRPC {}
+    public final record ClientWriteRequest(ActorRef<ClientRPC> sender, int entry) implements ServerRPC {}
+
+    public final record ClientReadUnstableRequest(ActorRef<ClientRPC> sender) implements ServerRPC {}
+    public final record ClientReadStableRequest(ActorRef<ClientRPC> sender) implements ServerRPC {}
     public final record Timeout() implements ServerRPC {}
     public final record Init(List<ActorRef<ServerRPC>> serverList) implements ServerRPC {}
     
     public final record End() implements ServerRPC {}
     public final record Kill() implements ServerRPC {}
+    public final record PingServer(ActorRef<ClientRPC> sender) implements ServerRPC {}
 }

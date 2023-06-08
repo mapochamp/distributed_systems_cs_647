@@ -40,6 +40,8 @@ public class Server extends AbstractBehavior<ServerRPC>{
         this.lastApplied = -1;
         this.currentLeader = null;
         this.lastVotedForTerm = 0;
+        this.stableState = 100;
+        this.unstableState = 100;
         this.serverList = new ArrayList<>();
         this.currentState = State.FOLLOWER;
         this.nextIndexMap = new HashMap<>();
@@ -70,6 +72,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
 
     // Volatile state
     int commitIndex;
+    // The state machine we apply log entries to
+    int stableState;
+    int unstableState;
     int lastApplied;
     int votesReceived;
     State currentState;
@@ -104,25 +109,32 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     break;
                 }
                 if(a.term() < currentTerm) {
+                    // case 1
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
                     break;
                     // reply false if log doesn't contain an entry at prevLogIndex
                     // whose term matches prevLogTerm
                 } else if(a.entry().isEmpty()) { // if heartbeat don't do anything
+                    // case 2
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             true, getContext().getSelf()));
                     currentLeader = a.sender();
                     break;
                 } else if(a.prevLogIndex() == 0 && log.size() == 0) {
+                    // case 3
                     // if we get an entry with prevLogIndex set to 0, we just apply it instead of sending false
+                    getContext().getLog().info(String.format("[Server %d] writing %d to disk case 3", id, a.entry().get(0)));
                     appendNewEntries(a.entry());
+                    stableState = recomputeState(true);
+                    unstableState = recomputeState(false);
                     lastApplied++;
                     updateCommitIndexFollower(a.leaderCommit());
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             true, getContext().getSelf()));
                     break;
                 } else if(getLogTerm(a.prevLogIndex()) != a.prevLogTerm()) {
+                    // case 4
                     a.sender().tell(new ServerRPC.AppendEntriesResult(currentTerm,
                             false, getContext().getSelf()));
                     break;
@@ -130,12 +142,16 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     // but different terms), delete the existing entry adn all that
                     // follow it
                 } else if(getLogTerm(a.prevLogIndex()) == a.prevLogTerm()) {
+                    // case 5
                     int conflictIdx = conflictExists(a.entry(), a.prevLogIndex()+1);
                     if(conflictIdx != -1) {
                         deleteConflicts(a.prevLogIndex()+1);
                     }
                     if(getLogTerm(a.prevLogIndex()+1) == -1) {
+                        getContext().getLog().info(String.format("[Server %d] writing %d to disk case 5", id, a.entry().get(0)));
                         appendNewEntries(a.entry());
+                        stableState = recomputeState(true);
+                        unstableState = recomputeState(false);
                         lastApplied++;
                     }
                     updateCommitIndexFollower(a.leaderCommit());
@@ -179,6 +195,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                             votedFor = r.candidateId();
                             r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, true,
                                     id, getContext().getSelf()));
+                            currentState = State.FOLLOWER;
                             break;
                         } else {
                             r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, false,
@@ -191,6 +208,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
                             votedFor = r.candidateId();
                             r.sender().tell(new ServerRPC.RequestVoteResult(currentTerm, true,
                                     id, getContext().getSelf()));
+                            currentState = State.FOLLOWER;
                             break;
                         }
                     }
@@ -221,21 +239,50 @@ public class Server extends AbstractBehavior<ServerRPC>{
                     sendAppendEntries();
                 }
                 break;
-            case ServerRPC.ClientRequest c:
+            case ServerRPC.ClientWriteRequest c:
                 if(currentState != State.LEADER) {
-                    c.sender().tell(new ClientRPC.RequestReject(currentLeader, c.entry()));
+                    c.sender().tell(new ClientRPC.RequestReject(currentLeader, c.entry(), true));
                 } else {
                     // the entry data structure is meant to be able take multiple entries at once even though
                     // we only send one at a time. this is just simulating things
+
+                    // Don't allow client to buy more tickets than exist
+                    if(c.entry() > stableState || c.entry() > unstableState) {
+                        // send requestReject to client
+                        break;
+                    }
+
                     List<Integer> entry = new ArrayList<>();
                     entry.add(c.entry());
                     entry.add(currentTerm);
+
                     // append the entry to your own log first
+                    getContext().getLog().info(String.format("[Server %d] writing %d - %d to disk from client request", id, stableState, c.entry()));
                     appendNewEntries(entry);
+                    stableState = recomputeState(true);
+                    unstableState = recomputeState(false);
                     lastApplied++;
                     sendAppendEntries();
                 }
                 break;
+
+            case ServerRPC.ClientReadUnstableRequest c:
+                List<Integer> unstableEntry = getEntry(lastApplied);
+                boolean unstableEntryEmpty = unstableEntry.isEmpty();
+                c.sender().tell(new ClientRPC.UnstableReadRequestResult(unstableState, unstableEntryEmpty));
+                break;
+
+            case ServerRPC.ClientReadStableRequest c:
+                List<Integer> stableEntry = getEntry(commitIndex);
+                boolean stableEntryEmpty = stableEntry.isEmpty();
+                if(currentState != State.LEADER) {
+                    c.sender().tell(new ClientRPC.StableReadRequestResult(stableState,
+                            true, false, currentLeader));
+                } else {
+                    c.sender().tell(new ClientRPC.StableReadRequestResult(stableState, stableEntryEmpty, true, currentLeader));
+                }
+                break;
+
             case ServerRPC.Timeout t:
                 if (currentState == State.LEADER) {
                     // reset timer to fixed number
@@ -272,6 +319,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 break;
             case ServerRPC.Kill k:
                 throw new RuntimeException("Simulated Failure");
+            case ServerRPC.PingServer p:
+                p.sender().tell(new ClientRPC.PingServerResponse());
+                break;
             case default:
                 return Behaviors.stopped();
         }
@@ -394,6 +444,7 @@ public class Server extends AbstractBehavior<ServerRPC>{
         List<Integer> newLine = new ArrayList<>();
         newLine.add(entry.get(0));
         newLine.add(entry.get(1));
+        //getContext().getLog().info(String.format("[Server %d] entry %d term %d", id, entry.get(0), entry.get(1)));
         log.add(newLine);
 
         try {
@@ -445,8 +496,9 @@ public class Server extends AbstractBehavior<ServerRPC>{
         for(var server : serverList) {
             if(nextIndexMap.get(server) == lastApplied) {
                 // if they're caught up just send a heart beat
-                server.tell(new ServerRPC.AppendEntries(currentTerm, id, nextIndexMap.get(server) - 1,
-                        getLogTerm(nextIndexMap.get(server) - 1), getEntry(lastApplied),
+                getContext().getLog().info(String.format("[Server %d] sending heartbeat", id));
+                server.tell(new ServerRPC.AppendEntries(currentTerm, id, lastApplied-1,
+                        getLogTerm(lastApplied-1), getEntry(lastApplied),
                         commitIndex, getContext().getSelf()));
             } else {
                 // if they aren't caught up then catch them up
@@ -462,6 +514,38 @@ public class Server extends AbstractBehavior<ServerRPC>{
                 }
             }
         }
+    }
+
+    private int recomputeState(boolean isStable) {
+        try {
+            log.readFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        int state = 100;
+        int index = 0;
+        List<Integer> entry = new ArrayList<>();
+
+        if(isStable) {
+            // read only up to the commit index if we're doing a consistent read
+            index = commitIndex;
+        } else {
+            // get all entries if we're doing an inconsistent read
+            index = log.size();
+        }
+        for(int i=0; i<index; i++) {
+            entry = log.get(i);
+            if(!entry.isEmpty()) {
+                state-=entry.get(0);
+            }
+        }
+
+        try {
+            log.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return state;
     }
 
     public record Pair<X, Y>(X first, Y second) {
