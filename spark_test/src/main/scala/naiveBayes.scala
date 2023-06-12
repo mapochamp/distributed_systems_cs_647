@@ -26,7 +26,7 @@ object NaiveBayesExample {
     val testTokens = testData.map(email => (email.label, email.text.split(" ")))
 
     println(s"count # of items")
-    println(testData.count())
+    println(s"$testData.count()")
     println(s"First item")
     println(testData.first())
   }
